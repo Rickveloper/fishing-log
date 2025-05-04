@@ -2,16 +2,19 @@
 <html>
 <head>
     <title>Fishing Log - Start</title>
+    <meta charset="utf-8">
     <style>
         body {
             font-family: sans-serif;
             background: #f0f0f0;
-            padding: 30px;
+            margin: 0;
+            height: 100vh;
             display: flex;
+            align-items: center;
             justify-content: center;
         }
         .container {
-            max-width: 400px;
+            max-width: 420px;
             width: 100%;
             background: white;
             padding: 30px;
@@ -29,14 +32,9 @@
             border-radius: 6px;
             outline: none;
         }
-        input:focus {
-            border-color: #007bff;
-            box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
-        }
-
         button {
             width: 100%;
-            padding: 12px 0;
+            padding: 14px;
             font-size: 18px;
             background: #007bff;
             border: none;
@@ -44,13 +42,11 @@
             color: white;
             font-weight: bold;
             cursor: pointer;
-            margin-top: 10px;
             transition: background 0.2s ease;
         }
         button:hover {
             background: #0056b3;
         }
-
         .top-link {
             text-align: center;
             margin-bottom: 20px;
@@ -60,6 +56,23 @@
             font-weight: bold;
             color: #007bff;
         }
+        ul#autocomplete-results {
+            list-style-type: none;
+            padding: 0;
+            margin-top: -10px;
+            max-height: 150px;
+            overflow-y: auto;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+        }
+        ul#autocomplete-results li {
+            padding: 10px;
+            cursor: pointer;
+        }
+        ul#autocomplete-results li:hover {
+            background: #eee;
+        }
     </style>
 </head>
 <body>
@@ -68,11 +81,42 @@
             <a href="/trips">View Past Trips</a>
         </div>
         <h1>Where and when did you fish?</h1>
-        <form method="POST">
-            <input type="text" name="location" placeholder="Enter Lake or Pond Name" required />
+        <form method="POST" id="trip-form">
+            <input type="text" name="location" id="location-input" placeholder="Enter Lake or Pond Name" autocomplete="off" required />
+            <ul id="autocomplete-results"></ul>
+            <input type="hidden" name="lat" id="lat" />
+            <input type="hidden" name="lon" id="lon" />
             <input type="date" name="date" required />
             <button type="submit">Start Log</button>
         </form>
     </div>
+
+    <script>
+        const input = document.getElementById("location-input");
+        const results = document.getElementById("autocomplete-results");
+
+        input.addEventListener("input", async () => {
+            const query = input.value;
+            if (query.length < 2) return results.innerHTML = "";
+            const res = await fetch(`https://photon.komoot.io/api/?q=${query}&limit=5&lang=en`);
+            const data = await res.json();
+            results.innerHTML = "";
+
+            data.features
+                .filter(f => f.properties.country === "United States")
+                .forEach(feature => {
+                    const li = document.createElement("li");
+                    li.textContent = feature.properties.name + ", " + (feature.properties.state || '');
+                    li.addEventListener("click", () => {
+                        input.value = feature.properties.name;
+                        document.getElementById("lat").value = feature.geometry.coordinates[1];
+                        document.getElementById("lon").value = feature.geometry.coordinates[0];
+                        results.innerHTML = "";
+                    });
+                    results.appendChild(li);
+                });
+        });
+    </script>
 </body>
 </html>
+

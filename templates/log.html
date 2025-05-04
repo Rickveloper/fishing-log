@@ -62,88 +62,93 @@
             max-width: 200px;
             display: block;
             margin-top: 10px;
+            cursor: pointer;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h2>{{ location }} — {{ date }}</h2>
-            <a href="/trips">View Past Trips</a>
-        </div>
-
-        <div id="map" class="map"></div>
-
-        <form class="catch-form" action="/add-catch" method="POST" enctype="multipart/form-data">
-            <h3>Add Catch</h3>
-            <select name="species" required>
-                <option disabled selected>Select Species</option>
-                <option>Largemouth Bass</option>
-                <option>Smallmouth Bass</option>
-            </select>
-            <select name="length" required>
-                <option disabled selected>Select Length (inches)</option>
-                {% for i in range(4, 121) %}
-                <option>{{ (i / 4)|round(2) }}</option>
-                {% endfor %}
-            </select>
-            <select name="weight" id="weight-select" required onchange="toggleCustomWeight(this.value)">
-                <option disabled selected>Select Weight (lbs)</option>
-                {% for i in range(1, 11) %}
-                <option>{{ i }}</option>
-                {% endfor %}
-                <option value="other">Other</option>
-            </select>
-            <input type="text" name="custom_weight" id="custom-weight" placeholder="Enter custom weight (lbs)" style="display: none; margin-top: 10px;" />
-
-            <script>
-            function toggleCustomWeight(value) {
-                const customInput = document.getElementById('custom-weight');
-                if (value === 'other') {
-                    customInput.style.display = 'block';
-                    customInput.setAttribute('required', 'required');
-                } else {
-                    customInput.style.display = 'none';
-                    customInput.removeAttribute('required');
-                }
-            }
-            </script>
-
-            <input type="text" name="bait" placeholder="Bait Used" required />
-            <input type="file" name="photo" required />
-            <button type="submit">Log Catch</button>
-        </form>
-
-        <h3 style="margin-top: 30px;">Catches</h3>
-        {% for c in catches %}
-        <div class="catch-entry">
-            <strong>{{ c.species }}</strong> — {{ c.length }}" / {{ c.weight }} lbs on {{ c.bait }}
-            {% if c.photo %}
-                <img src="{{ url_for('static', filename='uploads/' ~ c.photo) }}">
-            {% endif %}
-        </div>
-        {% endfor %}
+<div class="container">
+    <div class="header">
+        <h2>{{ location or 'None' }} — {{ date or 'None' }}</h2>
+        <a href="/trips">View Past Trips</a>
     </div>
 
-    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-    <script>
-        {% if catches and catches[-1].gps %}
-        const map = L.map('map').setView([{{ catches[-1].gps[0] }}, {{ catches[-1].gps[1] }}], 14);
-        {% else %}
-        const map = L.map('map').setView([43.0362, -72.1147], 13);
-        {% endif %}
+    <div id="map" class="map"></div>
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; OpenStreetMap contributors'
-        }).addTo(map);
+    <form class="catch-form" action="/add-catch?location={{ location }}&date={{ date }}&lat={{ map_center[0] }}&lon={{ map_center[1] }}" method="POST" enctype="multipart/form-data">
+        <h3>Add Catch</h3>
+        <select name="species" required>
+            <option disabled selected>Select Species</option>
+            <option>Largemouth Bass</option>
+            <option>Smallmouth Bass</option>
+        </select>
+        <select name="length" required>
+            <option disabled selected>Select Length (inches)</option>
+            {% for i in range(4, 121) %}
+                <option>{{ (i / 4)|round(2) }}</option>
+            {% endfor %}
+        </select>
+        <select name="weight" id="weight-select" required onchange="toggleCustomWeight(this.value)">
+            <option disabled selected>Select Weight (lbs)</option>
+            {% for i in range(1, 11) %}
+                <option>{{ i }}</option>
+            {% endfor %}
+            <option value="other">Other</option>
+        </select>
+        <input type="text" name="custom_weight" id="custom-weight" placeholder="Enter custom weight (lbs)" style="display: none;" />
+        <input type="text" name="bait" placeholder="Bait Used" required />
+        <input type="file" name="photo" required />
+        <button type="submit">Log Catch</button>
+    </form>
 
-        {% for c in catches %}
-        {% if c.gps %}
-        L.marker([{{ c.gps[0] }}, {{ c.gps[1] }}])
-            .addTo(map)
-            .bindPopup("<b>{{ c.species }}</b><br>{{ c.length }} in, {{ c.weight }} lbs<br>{{ c.bait }}<br><img src='{{ url_for('static', filename='uploads/' ~ c.photo) }}' width='100'>");
+    <h3 style="margin-top: 30px;">Catches</h3>
+    {% for c in catches %}
+    <div class="catch-entry">
+        <strong>{{ c.species }}</strong> — {{ c.length }}" / {{ c.weight }} lbs on {{ c.bait }}
+        {% if c.photo %}
+        <img src="{{ url_for('static', filename='uploads/' ~ c.photo) }}" onclick="openModal(this.src)">
         {% endif %}
-        {% endfor %}
-    </script>
+        {% if c.id %}
+        <a href="/edit-catch/{{ c.id }}">Edit</a>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+
+<div id="imgModal" onclick="this.style.display='none'" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background-color:rgba(0,0,0,0.8); align-items:center; justify-content:center; z-index:9999;">
+    <img id="modalImg" style="max-width:90%; max-height:90%; border: 4px solid white; box-shadow: 0 0 20px black;">
+</div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script>
+    const map = L.map('map').setView([{{ map_center[0]|float }}, {{ map_center[1]|float }}], 14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    {% for c in catches %}
+    {% if c.gps and c.gps|length == 2 %}
+    L.marker([{{ c.gps[0]|float }}, {{ c.gps[1]|float }}])
+        .addTo(map)
+        .bindPopup(`<b>{{ c.species }}</b><br>{{ c.length }} in, {{ c.weight }} lbs<br>{{ c.bait }}<br><img src='{{ url_for('static', filename='uploads/' ~ c.photo) }}' width='100'>`);
+    {% endif %}
+    {% endfor %}
+
+    function toggleCustomWeight(value) {
+        const customInput = document.getElementById('custom-weight');
+        if (value === 'other') {
+            customInput.style.display = 'block';
+            customInput.required = true;
+        } else {
+            customInput.style.display = 'none';
+            customInput.required = false;
+        }
+    }
+
+    function openModal(src) {
+        document.getElementById('modalImg').src = src;
+        document.getElementById('imgModal').style.display = 'flex';
+    }
+</script>
 </body>
 </html>

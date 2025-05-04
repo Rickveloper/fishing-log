@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Edit Catch</title>
+    <meta charset="utf-8">
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+        .container {
+            max-width: 600px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        h2 {
+            text-align: center;
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+        }
+        input, select {
+            padding: 10px;
+            margin-bottom: 12px;
+            font-size: 1em;
+        }
+        button {
+            padding: 10px;
+            font-size: 1em;
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Edit Catch</h2>
+        <form method="POST">
+            <label>Species:</label>
+            <select name="species" required>
+                <option {% if catch.species == 'Largemouth Bass' %}selected{% endif %}>Largemouth Bass</option>
+                <option {% if catch.species == 'Smallmouth Bass' %}selected{% endif %}>Smallmouth Bass</option>
+            </select>
+
+            <label>Length (inches):</label>
+            <select name="length" required>
+                {% for i in range(4, 121) %}
+                    <option {% if (i / 4)|round(2) == catch.length|float %}selected{% endif %}>{{ (i / 4)|round(2) }}</option>
+                {% endfor %}
+            </select>
+
+            <label>Weight (lbs):</label>
+            <select name="weight" id="weight-select" onchange="toggleCustomWeight(this.value)">
+                {% for i in range(1, 11) %}
+                    <option {% if catch.weight == i|string %}selected{% endif %}>{{ i }}</option>
+                {% endfor %}
+                <option value="other" {% if catch.weight|float > 10 %}selected{% endif %}>Other</option>
+            </select>
+            <input type="text" name="custom_weight" id="custom-weight" placeholder="Enter custom weight" 
+                   value="{% if catch.weight|float > 10 %}{{ catch.weight }}{% endif %}" 
+                   style="display: {% if catch.weight|float > 10 %}block{% else %}none{% endif %};" />
+
+            <label>Bait Used:</label>
+            <input type="text" name="bait" value="{{ catch.bait }}" required />
+
+            <button type="submit">Update Catch</button>
+        </form>
+    </div>
+
+    <script>
+        function toggleCustomWeight(value) {
+            const customInput = document.getElementById('custom-weight');
+            if (value === 'other') {
+                customInput.style.display = 'block';
+                customInput.required = true;
+            } else {
+                customInput.style.display = 'none';
+                customInput.required = false;
+            }
+        }
+    </script>
+</body>
+</html>

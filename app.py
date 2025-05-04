@@ -1,102 +1,138 @@
-from flask import Flask, render_template, request, redirect, url_for, session
+from flask import Flask, render_template, request, redirect, url_for
 import os
+import json
 from datetime import datetime
 from werkzeug.utils import secure_filename
-from PIL import Image
-import piexif
+import uuid
 
 app = Flask(__name__)
-app.secret_key = 'your-secret-key'  # change this to something strong
-UPLOAD_FOLDER = 'static/uploads'
+UPLOAD_FOLDER = os.path.join('static', 'uploads')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+LOG_PATH = 'catches.json'
 
-log = []
-
-def extract_gps(file_path):
-    try:
-        img = Image.open(file_path)
-        exif_data = img.info.get('exif')
-        if not exif_data:
-            return None
-        exif_dict = piexif.load(exif_data)
-        gps = exif_dict.get('GPS')
-        if not gps:
-            return None
-        def convert(value): return value[0][0]/value[0][1], value[1][0]/value[1][1], value[2][0]/value[2][1]
-        d, m, s = convert(gps[2])
-        lat = d + (m / 60.0) + (s / 3600.0)
-        if gps[1] == b'S':
-            lat = -lat
-        d, m, s = convert(gps[4])
-        lon = d + (m / 60.0) + (s / 3600.0)
-        if gps[3] == b'W':
-            lon = -lon
-        return (lat, lon)
-    except:
-        return None
-
-@app.route('/', methods=['GET', 'POST'])
+@app.route("/", methods=["GET", "POST"])
 def landing():
-    if request.method == 'POST':
-        session['location'] = request.form['location']
-        session['date'] = request.form['date']
-        return redirect(url_for('log_view'))
-    return render_template('landing.html')
+    if request.method == "POST":
+        location = request.form["location"]
+        date = request.form["date"]
+        lat = request.form.get("lat")
+        lon = request.form.get("lon")
+        return redirect(url_for("log", location=location, date=date, lat=lat, lon=lon))
+    return render_template("landing.html")
 
-@app.route('/log', methods=['GET'])
-def log_view():
-    location = session.get('location')
-    date = session.get('date')
-    catches = [c for c in log if c['location'] == location and c['date'] == date]
-    return render_template('log.html', location=location, date=date, catches=catches)
+@app.route("/log")
+def log():
+    location = request.args.get("location")
+    date = request.args.get("date")
+    lat = request.args.get("lat")
+    lon = request.args.get("lon")
 
-@app.route('/add-catch', methods=['POST'])
+    try:
+        with open(LOG_PATH, "r") as f:
+            all_catches = json.load(f)
+    except:
+        all_catches = []
+
+    # Filter catches only if location and date are provided
+    if location and date:
+        catches = [c for c in all_catches if c["location"] == location and c["date"] == date]
+    else:
+        catches = all_catches
+
+    # Map center logic: use URL lat/lon, first valid GPS, or fallback
+    if lat and lon:
+        map_center = [float(lat), float(lon)]
+    else:
+        first_with_gps = next((c for c in catches if c.get("gps") and len(c["gps"]) == 2), None)
+        map_center = first_with_gps["gps"] if first_with_gps else [43.0362, -72.1147]
+
+    return render_template("log.html", location=location, date=date, catches=catches, map_center=map_center)
+
+@app.route("/add-catch", methods=["POST"])
 def add_catch():
-    location = session.get('location')
-    date = session.get('date')
-    species = request.form['species']
-    bait = request.form['bait']
-    photo = request.files['photo']
-    photo_filename = secure_filename(photo.filename)
-    path = os.path.join(UPLOAD_FOLDER, photo_filename)
-    photo.save(path)
-    gps = extract_gps(path)
+    location = request.args.get("location")
+    date = request.args.get("date")
+    lat = request.args.get("lat")
+    lon = request.args.get("lon")
+
+    species = request.form.get("species")
+    length = request.form.get("length")
+    weight = request.form.get("custom_weight") or request.form.get("weight")
+    bait = request.form.get("bait")
+    photo = request.files["photo"]
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    filename = secure_filename(photo.filename)
+    photo_path = os.path.join(UPLOAD_FOLDER, filename)
+    photo.save(photo_path)
+    gps = [float(lat), float(lon)] if lat and lon else None
+
     entry = {
-    'date': date,
-    'location': location,
-    'species': species,
-    'bait': bait,
-    'length': request.form.get('length', 'Unknown'),
-    'weight': request.form.get('custom_weight') or request.form.get('weight', 'Unknown'),
-    'photo': photo_filename,
-    'gps': gps
-}
-    log.append(entry)
-    return redirect(url_for('log_view'))
+        "id": str(uuid.uuid4()),
+        "location": location,
+        "date": date,
+        "timestamp": timestamp,
+        "species": species,
+        "length": length,
+        "weight": weight,
+        "bait": bait,
+        "photo": filename,
+        "gps": gps
+    }
 
-@app.route('/trips')
+    try:
+        with open(LOG_PATH, "r") as f:
+            data = json.load(f)
+    except:
+        data = []
+
+    data.append(entry)
+    with open(LOG_PATH, "w") as f:
+        json.dump(data, f, indent=2)
+
+    return redirect(url_for("log", location=location, date=date, lat=lat, lon=lon))
+
+@app.route("/edit-catch/<catch_id>", methods=["GET", "POST"])
+def edit_catch(catch_id):
+    with open(LOG_PATH, "r") as f:
+        data = json.load(f)
+
+    catch = next((c for c in data if c["id"] == catch_id), None)
+    if not catch:
+        return "Catch not found", 404
+
+    if request.method == "POST":
+        catch["species"] = request.form.get("species")
+        catch["length"] = request.form.get("length")
+        catch["weight"] = request.form.get("custom_weight") or request.form.get("weight")
+        catch["bait"] = request.form.get("bait")
+
+        with open(LOG_PATH, "w") as f:
+            json.dump(data, f, indent=2)
+
+        return redirect(url_for("log", location=catch["location"], date=catch["date"]))
+
+    return render_template("edit.html", catch=catch)
+
+@app.route("/trips")
 def trips():
-    grouped = {}
-    for entry in log:
-        lake = entry['location']
-        date = entry['date']
-        if lake not in grouped:
-            grouped[lake] = set()
-        grouped[lake].add(date)
-    # Convert date sets to sorted lists
-    grouped_sorted = {k: sorted(list(v)) for k, v in grouped.items()}
-    return render_template('trips.html', trips=grouped_sorted)
+    try:
+        with open(LOG_PATH, "r") as f:
+            data = json.load(f)
+    except:
+        data = []
 
+    trips_by_lake = {}
+    for entry in data:
+        lake = entry["location"]
+        date = entry["date"]
+        if lake not in trips_by_lake:
+            trips_by_lake[lake] = set()
+        trips_by_lake[lake].add(date)
 
-@app.route('/set-trip')
-def set_trip():
-    location = request.args.get('location')
-    date = request.args.get('date')
-    session['location'] = location
-    session['date'] = date
-    return '', 204
+    for k in trips_by_lake:
+        trips_by_lake[k] = sorted(list(trips_by_lake[k]))
 
+    return render_template("trips.html", trips=trips_by_lake)
 
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5050, debug=True)
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5050, debug=True)
