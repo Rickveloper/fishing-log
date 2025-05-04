@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Fishing Log</title>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f0f0f0; }
+        form { margin-bottom: 40px; }
+        input, select { display: block; margin-bottom: 10px; padding: 8px; width: 100%; }
+        .log-entry { background: #fff; padding: 10px; margin-bottom: 20px; border-radius: 5px; }
+        img { max-width: 200px; display: block; margin-top: 5px; }
+        .map { height: 250px; margin-top: 10px; border-radius: 8px; }
+        ul.autocomplete { background: #fff; list-style: none; padding: 0; margin-top: -10px; border: 1px solid #ccc; max-height: 120px; overflow-y: auto; position: absolute; width: 100%; z-index: 99; }
+        ul.autocomplete li { padding: 5px; cursor: pointer; }
+        ul.autocomplete li:hover { background: #f0f0f0; }
+        .autocomplete-container { position: relative; }
+    </style>
+</head>
+<body>
+    <h1>Fishing Log</h1>
+    <form method="POST" enctype="multipart/form-data">
+        <label>Date: <input type="date" name="date" required></label>
+
+        <label>Location:</label>
+        <div class="autocomplete-container">
+            <input type="text" id="locationInput" name="location" autocomplete="off" required />
+            <ul id="autocompleteResults" class="autocomplete"></ul>
+        </div>
+
+        <label>Species:
+            <select name="species" required>
+                <option>Largemouth Bass</option>
+                <option>Smallmouth Bass</option>
+            </select>
+        </label>
+
+        <label>Bait Used: <input type="text" name="bait" required></label>
+        <label>Upload Photo: <input type="file" name="photo"></label>
+        <button type="submit">Log Catch</button>
+    </form>
+
+    <h2>Logged Trips</h2>
+    {% for trip in log %}
+    <div class="log-entry">
+        <strong>{{ trip.date }} - {{ trip.location }}</strong><br>
+        {{ trip.species }} on {{ trip.bait }}
+        {% if trip.photo %}
+            <img src="{{ url_for('static', filename='uploads/' ~ trip.photo) }}" />
+        {% endif %}
+        {% if trip.gps %}
+        <div id="map-{{ loop.index }}" class="map"></div>
+        <script>
+            const map{{ loop.index }} = L.map('map-{{ loop.index }}').setView([{{ trip.gps.lat }}, {{ trip.gps.lon }}], 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(map{{ loop.index }});
+            L.marker([{{ trip.gps.lat }}, {{ trip.gps.lon }}]).addTo(map{{ loop.index }});
+        </script>
+        {% endif %}
+    </div>
+    {% endfor %}
+
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script>
+        const input = document.getElementById('locationInput');
+        const results = document.getElementById('autocompleteResults');
+
+        input.addEventListener('input', () => {
+            const query = input.value;
+            if (query.length < 2) {
+                results.innerHTML = '';
+                return;
+            }
+
+            fetch(`/autocomplete?q=${query}`)
+                .then(res => res.json())
+                .then(data => {
+                    results.innerHTML = '';
+                    data.forEach(item => {
+                        const li = document.createElement('li');
+                        li.textContent = item.name;
+                        li.addEventListener('click', () => {
+                            input.value = item.name;
+                            results.innerHTML = '';
+                        });
+                        results.appendChild(li);
+                    });
+                });
+        });
+
+        document.addEventListener('click', e => {
+            if (!e.target.closest('.autocomplete-container')) {
+                results.innerHTML = '';
+            }
+        });
+    </script>
+</body>
+</html>
+

@@ -1,0 +1,8 @@
+version: '3'
+services:
+  fishing-log:
+    build: .
+    ports:
+      - "5050:5050"
+    volumes:
+      - ./static/uploads:/app/static/uploads

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Fishing Log - Start</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            background: #f0f0f0;
+            padding: 30px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            max-width: 400px;
+            width: 100%;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 16px;
+            font-size: 16px;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            outline: none;
+        }
+        input:focus {
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+        }
+
+        button {
+            width: 100%;
+            padding: 12px 0;
+            font-size: 18px;
+            background: #007bff;
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: background 0.2s ease;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+
+        .top-link {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .top-link a {
+            text-decoration: none;
+            font-weight: bold;
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="top-link">
+            <a href="/trips">View Past Trips</a>
+        </div>
+        <h1>Where and when did you fish?</h1>
+        <form method="POST">
+            <input type="text" name="location" placeholder="Enter Lake or Pond Name" required />
+            <input type="date" name="date" required />
+            <button type="submit">Start Log</button>
+        </form>
+    </div>
+</body>
+</html>

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Past Trips</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            background: #f0f0f0;
+            margin: 0;
+            padding: 30px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            max-width: 800px;
+            width: 100%;
+            background: #fff;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+        }
+        .folder {
+            margin-bottom: 10px;
+            cursor: pointer;
+            background: #e8e8e8;
+            padding: 12px;
+            border-radius: 6px;
+        }
+        .date-list {
+            display: none;
+            padding-left: 20px;
+            margin-top: 5px;
+        }
+        .date {
+            cursor: pointer;
+            margin: 6px 0;
+            padding: 6px;
+            background: #f4f4f4;
+            border-radius: 4px;
+        }
+        .nav {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .nav a {
+            text-decoration: none;
+            color: #007bff;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nav">
+            <a href="/">Start New Trip</a>
+        </div>
+        <h1>Past Trips</h1>
+
+        {% for lake, dates in trips.items() %}
+        <div class="folder" onclick="toggleDates('{{ loop.index }}')">
+            📁 {{ lake }}
+        </div>
+        <div class="date-list" id="dates-{{ loop.index }}">
+            {% for date in dates %}
+            <div class="date" onclick="goToTrip('{{ lake }}', '{{ date }}')">
+                📅 {{ date }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endfor %}
+    </div>
+
+    <script>
+        function toggleDates(id) {
+            const el = document.getElementById('dates-' + id);
+            el.style.display = (el.style.display === 'block') ? 'none' : 'block';
+        }
+
+        function goToTrip(lake, date) {
+            fetch(`/set-trip?location=${encodeURIComponent(lake)}&date=${encodeURIComponent(date)}`)
+                .then(() => {
+                    window.location.href = '/log';
+                });
+        }
+    </script>
+</body>
+</html>
