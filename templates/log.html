@@ -73,10 +73,24 @@
         <a href="/trips">View Past Trips</a>
     </div>
 
+    {% set fallback_used = false %}
+    {% if catches|length == 0 or (map_center[0] == 43.0362 and map_center[1] == -72.1147) %}
+        {% set fallback_used = true %}
+    {% endif %}
+    {% if fallback_used %}
+    <div style="background:#fff3cd;color:#856404;padding:12px;border-radius:6px;margin-bottom:16px;border:1px solid #ffeeba;">
+        <strong>Warning:</strong> No GPS found in photo. Pin location is set to map center. You can drag the pin to the correct spot before logging your catch.
+    </div>
+    {% endif %}
     <div id="map" class="map"></div>
 
-    <form class="catch-form" action="/add-catch?location={{ location }}&date={{ date }}&lat={{ map_center[0] }}&lon={{ map_center[1] }}" method="POST" enctype="multipart/form-data">
+    <form class="catch-form" action="/add-catch?location={{ location }}&date={{ date }}" method="POST" enctype="multipart/form-data" onsubmit="updateLatLonInputs()">
         <h3>Add Catch</h3>
+        <div style="margin-bottom:8px; color:#555; font-size:0.97em;">
+            <strong>Photo is required.</strong> GPS will be extracted from the photo if available and used for the catch location on the map. You can drag the pin to adjust the location.
+        </div>
+        <input type="hidden" name="lat" id="catch-lat" value="{{ map_center[0] }}" />
+        <input type="hidden" name="lon" id="catch-lon" value="{{ map_center[1] }}" />
         <select name="species" required>
             <option disabled selected>Select Species</option>
             <option>Largemouth Bass</option>
@@ -97,7 +111,8 @@
         </select>
         <input type="text" name="custom_weight" id="custom-weight" placeholder="Enter custom weight (lbs)" style="display: none;" />
         <input type="text" name="bait" placeholder="Bait Used" required />
-        <input type="file" name="photo" required />
+        <label style="margin-bottom:6px; font-weight:bold;">Catch Photo (required):</label>
+        <input type="file" name="photo" accept="image/*" required style="margin-bottom:16px;" />
         <button type="submit">Log Catch</button>
     </form>
 
@@ -121,11 +136,22 @@
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script>
+    let marker;
     const map = L.map('map').setView([{{ map_center[0]|float }}, {{ map_center[1]|float }}], 14);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
-
+    marker = L.marker([{{ map_center[0]|float }}, {{ map_center[1]|float }}], {draggable:true}).addTo(map);
+    marker.on('dragend', function(e) {
+        const latlng = marker.getLatLng();
+        document.getElementById('catch-lat').value = latlng.lat;
+        document.getElementById('catch-lon').value = latlng.lng;
+    });
+    function updateLatLonInputs() {
+        const latlng = marker.getLatLng();
+        document.getElementById('catch-lat').value = latlng.lat;
+        document.getElementById('catch-lon').value = latlng.lng;
+    }
     {% for c in catches %}
     {% if c.gps and c.gps|length == 2 %}
     L.marker([{{ c.gps[0]|float }}, {{ c.gps[1]|float }}])
@@ -133,7 +159,6 @@
         .bindPopup(`<b>{{ c.species }}</b><br>{{ c.length }} in, {{ c.weight }} lbs<br>{{ c.bait }}<br><img src='{{ url_for('static', filename='uploads/' ~ c.photo) }}' width='100'>`);
     {% endif %}
     {% endfor %}
-
     function toggleCustomWeight(value) {
         const customInput = document.getElementById('custom-weight');
         if (value === 'other') {
@@ -144,7 +169,6 @@
             customInput.required = false;
         }
     }
-
     function openModal(src) {
         document.getElementById('modalImg').src = src;
         document.getElementById('imgModal').style.display = 'flex';

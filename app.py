@@ -6,8 +6,10 @@ from werkzeug.utils import secure_filename
 import uuid
 from PIL import Image
 from PIL.ExifTags import TAGS, GPSTAGS
+from fractions import Fraction
 
 app = Flask(__name__)
+app.debug = True  # Enable debug mode
 UPLOAD_FOLDER = os.path.join('static', 'uploads')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 LOG_PATH = 'catches.json'
@@ -37,7 +39,7 @@ def log():
 
     # Filter catches only if location and date are provided
     if location and date:
-        catches = [c for c in all_catches if c["location"] == location and c["date"] == date]
+        catches = [c for c in all_catches if c.get("location") == location and c.get("date") == date]
     else:
         catches = all_catches
 
@@ -54,8 +56,8 @@ def log():
 def add_catch():
     location = request.args.get("location")
     date = request.args.get("date")
-    lat = request.args.get("lat")
-    lon = request.args.get("lon")
+    lat = request.form.get("lat")
+    lon = request.form.get("lon")
 
     species = request.form.get("species")
     length = request.form.get("length")
@@ -66,7 +68,47 @@ def add_catch():
     filename = secure_filename(photo.filename)
     photo_path = os.path.join(UPLOAD_FOLDER, filename)
     photo.save(photo_path)
-    gps = [float(lat), float(lon)] if lat and lon else None
+
+    # Extract GPS data from EXIF
+    gps_data = None
+    gps_fallback = False
+    try:
+        with Image.open(photo_path) as img:
+            exif = img._getexif()
+            if exif:
+                for tag_id in exif:
+                    tag = TAGS.get(tag_id, tag_id)
+                    if tag == "GPSInfo":
+                        gps_info = exif[tag_id]
+                        gps_data = {}
+                        for key in gps_info.keys():
+                            sub_tag = GPSTAGS.get(key, key)
+                            gps_data[sub_tag] = gps_info[key]
+                        # Convert GPS coordinates to decimal degrees
+                        if "GPSLatitude" in gps_data and "GPSLongitude" in gps_data:
+                            def _fraction_to_float(frac):
+                                if isinstance(frac, Fraction):
+                                    return float(frac)
+                                return frac
+                            lat_gps = [_fraction_to_float(x) for x in gps_data["GPSLatitude"]]
+                            lon_gps = [_fraction_to_float(x) for x in gps_data["GPSLongitude"]]
+                            lat_val = lat_gps[0] + lat_gps[1]/60 + lat_gps[2]/3600
+                            lon_val = lon_gps[0] + lon_gps[1]/60 + lon_gps[2]/3600
+                            if gps_data.get("GPSLatitudeRef") == "S":
+                                lat_val = -lat_val
+                            if gps_data.get("GPSLongitudeRef") == "W":
+                                lon_val = -lon_val
+                            gps_data = [lat_val, lon_val]
+                        else:
+                            gps_data = None
+    except Exception as e:
+        print(f"Error extracting EXIF data: {e}")
+        gps_data = None
+
+    # Only use fallback if photo has NO GPS
+    if not gps_data and lat and lon:
+        gps_data = [float(lat), float(lon)]
+        gps_fallback = True
 
     entry = {
         "id": str(uuid.uuid4()),
@@ -78,7 +120,8 @@ def add_catch():
         "weight": weight,
         "bait": bait,
         "photo": filename,
-        "gps": gps
+        "gps": gps_data,
+        "gps_fallback": gps_fallback
     }
 
     try:
@@ -87,6 +130,7 @@ def add_catch():
     except:
         data = []
 
+    entry = convert_fractions(entry)
     data.append(entry)
     with open(LOG_PATH, "w") as f:
         json.dump(data, f, indent=2)
@@ -125,8 +169,8 @@ def trips():
 
     trips_by_lake = {}
     for entry in data:
-        lake = entry["location"]
-        date = entry["date"]
+        lake = entry.get("location")
+        date = entry.get("date")
         if lake not in trips_by_lake:
             trips_by_lake[lake] = set()
         trips_by_lake[lake].add(date)
@@ -136,6 +180,7 @@ def trips():
 
     return render_template("trips.html", trips=trips_by_lake)
 
+<<<<<<< HEAD
 @app.route("/upload_photo", methods=["POST"])
 def upload_photo():
     print("Received photo upload request")
@@ -222,5 +267,25 @@ def upload_photo():
 def upload_test():
     return render_template("upload_test.html")
 
+=======
+@app.route("/upload_test")
+def upload_test():
+    print("Upload test route accessed")  # Debug log
+    return render_template("upload_test.html")
+
+def convert_fractions(obj):
+    if isinstance(obj, Fraction):
+        return float(obj)
+    elif isinstance(obj, dict):
+        return {k: convert_fractions(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [convert_fractions(x) for x in obj]
+    else:
+        return obj
+
+>>>>>>> f4af303 (Stable working version with GPS/photo improvements and UI enhancements)
 if __name__ == "__main__":
+    print("Starting Flask application...")
+    print(f"Upload folder: {UPLOAD_FOLDER}")
+    print(f"Log path: {LOG_PATH}")
     app.run(host="0.0.0.0", port=5050, debug=True)
