@@ -4,6 +4,8 @@ import json
 from datetime import datetime
 from werkzeug.utils import secure_filename
 import uuid
+from PIL import Image
+from PIL.ExifTags import TAGS, GPSTAGS
 
 app = Flask(__name__)
 UPLOAD_FOLDER = os.path.join('static', 'uploads')
@@ -133,6 +135,92 @@ def trips():
         trips_by_lake[k] = sorted(list(trips_by_lake[k]))
 
     return render_template("trips.html", trips=trips_by_lake)
+
+@app.route("/upload_photo", methods=["POST"])
+def upload_photo():
+    print("Received photo upload request")
+    
+    if "photo" not in request.files:
+        print("No photo in request")
+        return "No photo uploaded", 400
+    
+    photo = request.files["photo"]
+    if photo.filename == "":
+        print("Empty filename")
+        return "No selected file", 400
+
+    # Save the photo
+    filename = secure_filename(photo.filename)
+    photo_path = os.path.join(UPLOAD_FOLDER, filename)
+    print(f"Saving photo to: {photo_path}")
+    photo.save(photo_path)
+
+    # Extract GPS data from EXIF
+    gps_data = None
+    try:
+        print("Attempting to extract EXIF data")
+        with Image.open(photo_path) as img:
+            exif = img._getexif()
+            if exif:
+                print("Found EXIF data")
+                for tag_id in exif:
+                    tag = TAGS.get(tag_id, tag_id)
+                    if tag == "GPSInfo":
+                        print("Found GPS info in EXIF")
+                        gps_info = exif[tag_id]
+                        gps_data = {}
+                        for key in gps_info.keys():
+                            sub_tag = GPSTAGS.get(key, key)
+                            gps_data[sub_tag] = gps_info[key]
+                        
+                        # Convert GPS coordinates to decimal degrees
+                        if "GPSLatitude" in gps_data and "GPSLongitude" in gps_data:
+                            print("Converting GPS coordinates")
+                            lat = gps_data["GPSLatitude"]
+                            lon = gps_data["GPSLongitude"]
+                            
+                            # Convert to decimal degrees
+                            lat = lat[0] + lat[1]/60 + lat[2]/3600
+                            lon = lon[0] + lon[1]/60 + lon[2]/3600
+                            
+                            # Adjust for South/West
+                            if gps_data.get("GPSLatitudeRef") == "S":
+                                lat = -lat
+                            if gps_data.get("GPSLongitudeRef") == "W":
+                                lon = -lon
+                            
+                            gps_data = [lat, lon]
+                            print(f"Extracted GPS coordinates: {gps_data}")
+    except Exception as e:
+        print(f"Error extracting EXIF data: {e}")
+        gps_data = None
+
+    # Create entry
+    entry = {
+        "id": str(uuid.uuid4()),
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "photo": filename,
+        "gps": gps_data
+    }
+    print(f"Created entry: {entry}")
+
+    # Save to catches.json
+    try:
+        with open(LOG_PATH, "r") as f:
+            data = json.load(f)
+    except:
+        data = []
+
+    data.append(entry)
+    with open(LOG_PATH, "w") as f:
+        json.dump(data, f, indent=2)
+    print("Saved entry to catches.json")
+
+    return redirect(url_for("log"))
+
+@app.route("/upload_test")
+def upload_test():
+    return render_template("upload_test.html")
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5050, debug=True)
