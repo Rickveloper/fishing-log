@@ -70,7 +70,10 @@
 <div class="container">
     <div class="header">
         <h2>{{ location or 'None' }} — {{ date or 'None' }}</h2>
-        <a href="/trips">View Past Trips</a>
+        <div>
+            <a href="/trips" style="margin-right: 15px;">View Past Trips</a>
+            <a href="/statistics">View Statistics</a>
+        </div>
     </div>
 
     {% set fallback_used = false %}
@@ -91,11 +94,24 @@
         </div>
         <input type="hidden" name="lat" id="catch-lat" value="{{ map_center[0] }}" />
         <input type="hidden" name="lon" id="catch-lon" value="{{ map_center[1] }}" />
-        <select name="species" required>
-            <option disabled selected>Select Species</option>
+        <input type="text" name="species" id="species-input" placeholder="Species (autocomplete)" required list="species-list" />
+        <datalist id="species-list">
             <option>Largemouth Bass</option>
             <option>Smallmouth Bass</option>
-        </select>
+            <option>Rainbow Trout</option>
+            <option>Brown Trout</option>
+            <option>Brook Trout</option>
+            <option>Yellow Perch</option>
+            <option>Bluegill</option>
+            <option>Crappie</option>
+            <option>Pike</option>
+            <option>Pickerel</option>
+            <option>Sunfish</option>
+            <option>Walleye</option>
+            <option>Catfish</option>
+            <option>Carp</option>
+            <option>Other</option>
+        </datalist>
         <select name="length" required>
             <option disabled selected>Select Length (inches)</option>
             {% for i in range(4, 121) %}
@@ -111,6 +127,8 @@
         </select>
         <input type="text" name="custom_weight" id="custom-weight" placeholder="Enter custom weight (lbs)" style="display: none;" />
         <input type="text" name="bait" placeholder="Bait Used" required />
+        <input type="text" name="weather" placeholder="Weather (optional)" />
+        <textarea name="notes" placeholder="Notes (optional)" rows="2" style="width:100%;margin-bottom:10px;"></textarea>
         <label style="margin-bottom:6px; font-weight:bold;">Catch Photo (required):</label>
         <input type="file" name="photo" accept="image/*" required style="margin-bottom:16px;" />
         <button type="submit">Log Catch</button>
@@ -120,11 +138,16 @@
     {% for c in catches %}
     <div class="catch-entry">
         <strong>{{ c.species }}</strong> — {{ c.length }}" / {{ c.weight }} lbs on {{ c.bait }}
+        {% if c.weather %}<br><span style="color:#888;">Weather: {{ c.weather }}</span>{% endif %}
+        {% if c.notes %}<br><span style="color:#888;">Notes: {{ c.notes }}</span>{% endif %}
         {% if c.photo %}
-        <img src="{{ url_for('static', filename='uploads/' ~ c.photo) }}" onclick="openModal(this.src)">
+        <img src="{{ url_for('static', filename='uploads/' ~ c.photo) }}" onclick="openModal(this.src)" style="max-width:180px;border-radius:8px;box-shadow:0 2px 8px #0002;margin-top:8px;">
         {% endif %}
         {% if c.id %}
         <a href="/edit-catch/{{ c.id }}">Edit</a>
+        <form action="/delete-catch/{{ c.id }}" method="POST" style="display:inline;">
+            <button type="submit" style="background:#dc3545;color:white;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;margin-left:8px;">Delete</button>
+        </form>
         {% endif %}
     </div>
     {% endfor %}
@@ -136,27 +159,42 @@
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script>
-    let marker;
+    let marker = null;
     const map = L.map('map').setView([{{ map_center[0]|float }}, {{ map_center[1]|float }}], 14);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
-    marker = L.marker([{{ map_center[0]|float }}, {{ map_center[1]|float }}], {draggable:true}).addTo(map);
-    marker.on('dragend', function(e) {
-        const latlng = marker.getLatLng();
-        document.getElementById('catch-lat').value = latlng.lat;
-        document.getElementById('catch-lon').value = latlng.lng;
-    });
-    function updateLatLonInputs() {
-        const latlng = marker.getLatLng();
-        document.getElementById('catch-lat').value = latlng.lat;
-        document.getElementById('catch-lon').value = latlng.lng;
+
+    // Only add the draggable marker when the form is focused
+    function addDraggableMarker() {
+        if (marker) return; // Only add once
+        marker = L.marker([{{ map_center[0]|float }}, {{ map_center[1]|float }}], {draggable:true}).addTo(map);
+        marker.bindTooltip('Drag the marker to set catch location', {permanent: false, direction: 'top'});
+        marker.on('dragend', function(e) {
+            const latlng = marker.getLatLng();
+            document.getElementById('catch-lat').value = latlng.lat;
+            document.getElementById('catch-lon').value = latlng.lng;
+        });
     }
+
+    // Add event listeners to form fields to trigger marker creation
+    document.querySelectorAll('.catch-form input, .catch-form select, .catch-form textarea').forEach(el => {
+        el.addEventListener('focus', addDraggableMarker, {once: true});
+    });
+
+    function updateLatLonInputs() {
+        if (marker) {
+            const latlng = marker.getLatLng();
+            document.getElementById('catch-lat').value = latlng.lat;
+            document.getElementById('catch-lon').value = latlng.lng;
+        }
+    }
+
     {% for c in catches %}
     {% if c.gps and c.gps|length == 2 %}
     L.marker([{{ c.gps[0]|float }}, {{ c.gps[1]|float }}])
         .addTo(map)
-        .bindPopup(`<b>{{ c.species }}</b><br>{{ c.length }} in, {{ c.weight }} lbs<br>{{ c.bait }}<br><img src='{{ url_for('static', filename='uploads/' ~ c.photo) }}' width='100'>`);
+        .bindPopup(`<b>{{ c.species }}</b><br>{{ c.length }} in, {{ c.weight }} lbs<br>{{ c.bait }}<br>{% if c.weather %}Weather: {{ c.weather }}<br>{% endif %}{% if c.notes %}Notes: {{ c.notes }}<br>{% endif %}<img src='{{ url_for('static', filename='uploads/' ~ c.photo) }}' style='max-width:160px;border-radius:8px;box-shadow:0 2px 8px #0002;margin-top:8px;'>`);
     {% endif %}
     {% endfor %}
     function toggleCustomWeight(value) {

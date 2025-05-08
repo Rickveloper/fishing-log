@@ -2,3 +2,4 @@ Flask
 requests
 Pillow
 piexif
+python-dotenv

@@ -1,1 +1,32 @@
-[]
+[
+  {
+    "id": "b1a5269c-f3b4-42b8-82a9-0af7a8d5281b",
+    "location": "Island Pond",
+    "date": "2025-05-03",
+    "timestamp": "2025-05-07 23:31:51",
+    "species": "Largemouth Bass",
+    "length": "15.5",
+    "weight": "4",
+    "bait": "chatterbait",
+    "weather": null,
+    "weather_data": {
+      "temperature": 58.3,
+      "feels_like": 57.69,
+      "humidity": 82,
+      "pressure": 1013,
+      "wind_speed": 8.03,
+      "wind_direction": 257,
+      "weather_description": "overcast clouds",
+      "weather_icon": "04d",
+      "clouds": 87,
+      "timestamp": "2025-05-07T23:31:52"
+    },
+    "notes": null,
+    "photo": "IMG_8518.jpeg",
+    "gps": [
+      43.06306111111111,
+      -72.08498333333333
+    ],
+    "gps_fallback": false
+  }
+]

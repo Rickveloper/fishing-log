@@ -7,12 +7,14 @@ import uuid
 from PIL import Image
 from PIL.ExifTags import TAGS, GPSTAGS
 from fractions import Fraction
+from weather_service import WeatherService
 
 app = Flask(__name__)
 app.debug = True  # Enable debug mode
 UPLOAD_FOLDER = os.path.join('static', 'uploads')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 LOG_PATH = 'catches.json'
+weather_service = WeatherService()
 
 @app.route("/", methods=["GET", "POST"])
 def landing():
@@ -63,11 +65,18 @@ def add_catch():
     length = request.form.get("length")
     weight = request.form.get("custom_weight") or request.form.get("weight")
     bait = request.form.get("bait")
+    weather = request.form.get("weather")
+    notes = request.form.get("notes")
     photo = request.files["photo"]
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     filename = secure_filename(photo.filename)
     photo_path = os.path.join(UPLOAD_FOLDER, filename)
     photo.save(photo_path)
+
+    # Get weather data if coordinates are available
+    weather_data = None
+    if lat and lon:
+        weather_data = weather_service.get_current_weather(float(lat), float(lon))
 
     # Extract GPS data from EXIF
     gps_data = None
@@ -119,6 +128,9 @@ def add_catch():
         "length": length,
         "weight": weight,
         "bait": bait,
+        "weather": weather,
+        "weather_data": weather_data,
+        "notes": notes,
         "photo": filename,
         "gps": gps_data,
         "gps_fallback": gps_fallback
@@ -151,6 +163,8 @@ def edit_catch(catch_id):
         catch["length"] = request.form.get("length")
         catch["weight"] = request.form.get("custom_weight") or request.form.get("weight")
         catch["bait"] = request.form.get("bait")
+        catch["weather"] = request.form.get("weather")
+        catch["notes"] = request.form.get("notes")
 
         with open(LOG_PATH, "w") as f:
             json.dump(data, f, indent=2)
@@ -158,6 +172,18 @@ def edit_catch(catch_id):
         return redirect(url_for("log", location=catch["location"], date=catch["date"]))
 
     return render_template("edit.html", catch=catch)
+
+@app.route("/delete-catch/<catch_id>", methods=["POST"])
+def delete_catch(catch_id):
+    try:
+        with open(LOG_PATH, "r") as f:
+            data = json.load(f)
+    except:
+        data = []
+    new_data = [c for c in data if c["id"] != catch_id]
+    with open(LOG_PATH, "w") as f:
+        json.dump(new_data, f, indent=2)
+    return redirect(request.referrer or url_for("log"))
 
 @app.route("/trips")
 def trips():
@@ -180,98 +206,75 @@ def trips():
 
     return render_template("trips.html", trips=trips_by_lake)
 
-<<<<<<< HEAD
-@app.route("/upload_photo", methods=["POST"])
-def upload_photo():
-    print("Received photo upload request")
-    
-    if "photo" not in request.files:
-        print("No photo in request")
-        return "No photo uploaded", 400
-    
-    photo = request.files["photo"]
-    if photo.filename == "":
-        print("Empty filename")
-        return "No selected file", 400
-
-    # Save the photo
-    filename = secure_filename(photo.filename)
-    photo_path = os.path.join(UPLOAD_FOLDER, filename)
-    print(f"Saving photo to: {photo_path}")
-    photo.save(photo_path)
-
-    # Extract GPS data from EXIF
-    gps_data = None
-    try:
-        print("Attempting to extract EXIF data")
-        with Image.open(photo_path) as img:
-            exif = img._getexif()
-            if exif:
-                print("Found EXIF data")
-                for tag_id in exif:
-                    tag = TAGS.get(tag_id, tag_id)
-                    if tag == "GPSInfo":
-                        print("Found GPS info in EXIF")
-                        gps_info = exif[tag_id]
-                        gps_data = {}
-                        for key in gps_info.keys():
-                            sub_tag = GPSTAGS.get(key, key)
-                            gps_data[sub_tag] = gps_info[key]
-                        
-                        # Convert GPS coordinates to decimal degrees
-                        if "GPSLatitude" in gps_data and "GPSLongitude" in gps_data:
-                            print("Converting GPS coordinates")
-                            lat = gps_data["GPSLatitude"]
-                            lon = gps_data["GPSLongitude"]
-                            
-                            # Convert to decimal degrees
-                            lat = lat[0] + lat[1]/60 + lat[2]/3600
-                            lon = lon[0] + lon[1]/60 + lon[2]/3600
-                            
-                            # Adjust for South/West
-                            if gps_data.get("GPSLatitudeRef") == "S":
-                                lat = -lat
-                            if gps_data.get("GPSLongitudeRef") == "W":
-                                lon = -lon
-                            
-                            gps_data = [lat, lon]
-                            print(f"Extracted GPS coordinates: {gps_data}")
-    except Exception as e:
-        print(f"Error extracting EXIF data: {e}")
-        gps_data = None
-
-    # Create entry
-    entry = {
-        "id": str(uuid.uuid4()),
-        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "photo": filename,
-        "gps": gps_data
-    }
-    print(f"Created entry: {entry}")
-
-    # Save to catches.json
-    try:
-        with open(LOG_PATH, "r") as f:
-            data = json.load(f)
-    except:
-        data = []
-
-    data.append(entry)
-    with open(LOG_PATH, "w") as f:
-        json.dump(data, f, indent=2)
-    print("Saved entry to catches.json")
-
-    return redirect(url_for("log"))
-
-@app.route("/upload_test")
-def upload_test():
-    return render_template("upload_test.html")
-
-=======
 @app.route("/upload_test")
 def upload_test():
     print("Upload test route accessed")  # Debug log
     return render_template("upload_test.html")
+
+@app.route("/statistics")
+def statistics():
+    try:
+        with open(LOG_PATH, "r") as f:
+            catches = json.load(f)
+    except:
+        catches = []
+
+    # Calculate statistics
+    stats = {
+        "total_catches": len(catches),
+        "species_count": {},
+        "weather_patterns": {},
+        "bait_effectiveness": {},
+        "time_of_day": {
+            "morning": 0,  # 5-11
+            "afternoon": 0,  # 11-17
+            "evening": 0,  # 17-23
+            "night": 0,  # 23-5
+        }
+    }
+
+    for catch in catches:
+        # Species count
+        species = catch.get("species", "Unknown")
+        stats["species_count"][species] = stats["species_count"].get(species, 0) + 1
+
+        # Weather patterns
+        if catch.get("weather_data"):
+            weather_desc = catch["weather_data"].get("weather_description", "Unknown")
+            stats["weather_patterns"][weather_desc] = stats["weather_patterns"].get(weather_desc, 0) + 1
+
+        # Bait effectiveness
+        bait = catch.get("bait", "Unknown")
+        if bait not in stats["bait_effectiveness"]:
+            stats["bait_effectiveness"][bait] = {
+                "count": 0,
+                "total_weight": 0,
+                "species": set()
+            }
+        stats["bait_effectiveness"][bait]["count"] += 1
+        stats["bait_effectiveness"][bait]["total_weight"] += float(catch.get("weight", 0))
+        stats["bait_effectiveness"][bait]["species"].add(species)
+
+        # Time of day
+        try:
+            catch_time = datetime.strptime(catch["timestamp"], "%Y-%m-%d %H:%M:%S")
+            hour = catch_time.hour
+            if 5 <= hour < 11:
+                stats["time_of_day"]["morning"] += 1
+            elif 11 <= hour < 17:
+                stats["time_of_day"]["afternoon"] += 1
+            elif 17 <= hour < 23:
+                stats["time_of_day"]["evening"] += 1
+            else:
+                stats["time_of_day"]["night"] += 1
+        except:
+            pass
+
+    # Convert sets to lists for JSON serialization
+    for bait in stats["bait_effectiveness"]:
+        stats["bait_effectiveness"][bait]["species"] = list(stats["bait_effectiveness"][bait]["species"])
+
+    return render_template("statistics.html", stats=stats)
 
 def convert_fractions(obj):
     if isinstance(obj, Fraction):
@@ -283,9 +286,8 @@ def convert_fractions(obj):
     else:
         return obj
 
->>>>>>> f4af303 (Stable working version with GPS/photo improvements and UI enhancements)
 if __name__ == "__main__":
     print("Starting Flask application...")
     print(f"Upload folder: {UPLOAD_FOLDER}")
     print(f"Log path: {LOG_PATH}")
-    app.run(host="0.0.0.0", port=5050, debug=True)
+    app.run(host="0.0.0.0", port=5051, debug=True)
