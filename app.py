@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, jsonify
 import os
 import json
 from datetime import datetime
@@ -8,6 +8,7 @@ from PIL import Image
 from PIL.ExifTags import TAGS, GPSTAGS
 from fractions import Fraction
 from weather_service import WeatherService
+import requests
 
 app = Flask(__name__)
 app.debug = True  # Enable debug mode
@@ -52,7 +53,43 @@ def log():
         first_with_gps = next((c for c in catches if c.get("gps") and len(c["gps"]) == 2), None)
         map_center = first_with_gps["gps"] if first_with_gps else [43.0362, -72.1147]
 
-    return render_template("log.html", location=location, date=date, catches=catches, map_center=map_center)
+    # Trip summary stats
+    trip_stats = {
+        'total_catches': len(catches),
+        'biggest_fish': None,
+        'most_common_species': None,
+        'total_weight': 0
+    }
+    # Find biggest fish and most common species
+    max_length = 0
+    species_count = {}
+    for c in catches:
+        # Biggest fish by length
+        try:
+            l = float(c.get('length', 0))
+            if l > max_length:
+                max_length = l
+                trip_stats['biggest_fish'] = {
+                    'species': c.get('species'),
+                    'length': c.get('length'),
+                    'weight': c.get('weight')
+                }
+        except:
+            pass
+        # Most common species
+        s = c.get('species')
+        if s:
+            species_count[s] = species_count.get(s, 0) + 1
+        # Total weight
+        try:
+            w = float(c.get('weight', 0))
+            trip_stats['total_weight'] += w
+        except:
+            pass
+    if species_count:
+        trip_stats['most_common_species'] = max(species_count, key=species_count.get)
+
+    return render_template("log.html", location=location, date=date, catches=catches, map_center=map_center, trip_stats=trip_stats, all_catches=all_catches)
 
 @app.route("/add-catch", methods=["POST"])
 def add_catch():
@@ -187,19 +224,28 @@ def delete_catch(catch_id):
 
 @app.route("/trips")
 def trips():
+    from datetime import datetime
     try:
         with open(LOG_PATH, "r") as f:
             data = json.load(f)
     except:
         data = []
 
+    today = datetime.now().date()
     trips_by_lake = {}
     for entry in data:
-        lake = entry.get("location")
-        date = entry.get("date")
-        if lake not in trips_by_lake:
-            trips_by_lake[lake] = set()
-        trips_by_lake[lake].add(date)
+        # Only consider entries that are catches (not plans), have a photo, and are in the past
+        if entry.get("photo") and entry.get("date") and entry.get("date") != "None":
+            try:
+                entry_date = datetime.strptime(entry["date"], "%Y-%m-%d").date()
+                if entry_date < today:
+                    lake = entry.get("location")
+                    date = entry.get("date")
+                    if lake not in trips_by_lake:
+                        trips_by_lake[lake] = set()
+                    trips_by_lake[lake].add(date)
+            except:
+                continue
 
     for k in trips_by_lake:
         trips_by_lake[k] = sorted(list(trips_by_lake[k]))
@@ -219,62 +265,242 @@ def statistics():
     except:
         catches = []
 
-    # Calculate statistics
+    # Initialize statistics
     stats = {
-        "total_catches": len(catches),
-        "species_count": {},
-        "weather_patterns": {},
-        "bait_effectiveness": {},
-        "time_of_day": {
-            "morning": 0,  # 5-11
-            "afternoon": 0,  # 11-17
-            "evening": 0,  # 17-23
-            "night": 0,  # 23-5
-        }
+        'total_catches': len(catches),
+        'species_count': {},
+        'time_of_day': {
+            'morning': 0,    # 5-11
+            'afternoon': 0,  # 11-17
+            'evening': 0,    # 17-23
+            'night': 0       # 23-5
+        },
+        'weather_patterns': {},
+        'bait_effectiveness': {},
+        'average_size': {},
+        'total_weight': 0
     }
 
     for catch in catches:
-        # Species count
-        species = catch.get("species", "Unknown")
-        stats["species_count"][species] = stats["species_count"].get(species, 0) + 1
+        # Count species
+        species = catch.get('species')
+        if species:
+            stats['species_count'][species] = stats['species_count'].get(species, 0) + 1
+
+        # Time of day analysis
+        if 'timestamp' in catch:
+            try:
+                hour = datetime.strptime(catch['timestamp'], "%Y-%m-%d %H:%M:%S").hour
+                if 5 <= hour < 11:
+                    stats['time_of_day']['morning'] += 1
+                elif 11 <= hour < 17:
+                    stats['time_of_day']['afternoon'] += 1
+                elif 17 <= hour < 23:
+                    stats['time_of_day']['evening'] += 1
+                else:
+                    stats['time_of_day']['night'] += 1
+            except:
+                pass
 
         # Weather patterns
-        if catch.get("weather_data"):
-            weather_desc = catch["weather_data"].get("weather_description", "Unknown")
-            stats["weather_patterns"][weather_desc] = stats["weather_patterns"].get(weather_desc, 0) + 1
+        if catch.get('weather_data', {}).get('weather_description'):
+            weather = catch['weather_data']['weather_description']
+            stats['weather_patterns'][weather] = stats['weather_patterns'].get(weather, 0) + 1
 
         # Bait effectiveness
-        bait = catch.get("bait", "Unknown")
-        if bait not in stats["bait_effectiveness"]:
-            stats["bait_effectiveness"][bait] = {
-                "count": 0,
-                "total_weight": 0,
-                "species": set()
-            }
-        stats["bait_effectiveness"][bait]["count"] += 1
-        stats["bait_effectiveness"][bait]["total_weight"] += float(catch.get("weight", 0))
-        stats["bait_effectiveness"][bait]["species"].add(species)
+        bait = catch.get('bait')
+        if bait:
+            if bait not in stats['bait_effectiveness']:
+                stats['bait_effectiveness'][bait] = {'count': 0, 'total_weight': 0}
+            stats['bait_effectiveness'][bait]['count'] += 1
+            if catch.get('weight'):
+                try:
+                    weight = float(catch['weight'])
+                    stats['bait_effectiveness'][bait]['total_weight'] += weight
+                except:
+                    pass
 
-        # Time of day
-        try:
-            catch_time = datetime.strptime(catch["timestamp"], "%Y-%m-%d %H:%M:%S")
-            hour = catch_time.hour
-            if 5 <= hour < 11:
-                stats["time_of_day"]["morning"] += 1
-            elif 11 <= hour < 17:
-                stats["time_of_day"]["afternoon"] += 1
-            elif 17 <= hour < 23:
-                stats["time_of_day"]["evening"] += 1
-            else:
-                stats["time_of_day"]["night"] += 1
-        except:
-            pass
+        # Size statistics
+        if species and catch.get('length'):
+            try:
+                length = float(catch['length'])
+                if species not in stats['average_size']:
+                    stats['average_size'][species] = {'total': 0, 'count': 0}
+                stats['average_size'][species]['total'] += length
+                stats['average_size'][species]['count'] += 1
+            except:
+                pass
 
-    # Convert sets to lists for JSON serialization
-    for bait in stats["bait_effectiveness"]:
-        stats["bait_effectiveness"][bait]["species"] = list(stats["bait_effectiveness"][bait]["species"])
+        # Total weight
+        if catch.get('weight'):
+            try:
+                stats['total_weight'] += float(catch['weight'])
+            except:
+                pass
+
+    # Calculate averages
+    for species in stats['average_size']:
+        if stats['average_size'][species]['count'] > 0:
+            stats['average_size'][species]['average'] = round(
+                stats['average_size'][species]['total'] / stats['average_size'][species]['count'], 2
+            )
 
     return render_template("statistics.html", stats=stats)
+
+@app.route("/gallery")
+def gallery():
+    try:
+        with open(LOG_PATH, "r") as f:
+            catches = json.load(f)
+    except:
+        catches = []
+    return render_template("gallery.html", catches=catches)
+
+@app.route("/calendar")
+def calendar():
+    try:
+        with open(LOG_PATH, "r") as f:
+            catches = json.load(f)
+    except:
+        catches = []
+    
+    # Get unique locations from catches
+    locations = list(set(c.get("location") for c in catches if c.get("location")))
+    
+    return render_template("calendar.html", locations=locations)
+
+@app.route("/add-fishing-plan", methods=["POST"])
+def add_fishing_plan():
+    location = request.form.get("location")
+    date = request.form.get("date")
+    notes = request.form.get("notes")
+    
+    try:
+        with open(LOG_PATH, "r") as f:
+            data = json.load(f)
+    except:
+        data = []
+    
+    # Add the plan to the data
+    plan = {
+        "id": str(uuid.uuid4()),
+        "type": "plan",
+        "location": location,
+        "date": date,
+        "notes": notes,
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
+    
+    data.append(plan)
+    with open(LOG_PATH, "w") as f:
+        json.dump(data, f, indent=2)
+    
+    return redirect(url_for("calendar"))
+
+@app.route("/get-lake-info/<location>")
+def get_lake_info(location):
+    # This would be where we'd integrate with various APIs
+    # For now, return mock data and user's own catch history
+    try:
+        with open(LOG_PATH, "r") as f:
+            data = json.load(f)
+    except:
+        data = []
+    # Normalize location for matching (strip NH, etc)
+    norm_loc = location.split('(')[0].strip().lower()
+    user_catches = [
+        {
+            "species": c.get("species"),
+            "length": c.get("length"),
+            "weight": c.get("weight"),
+            "date": c.get("date")
+        }
+        for c in data
+        if c.get("location") and norm_loc in c.get("location", "").lower() and c.get("species") and c.get("date") and c.get("photo")
+    ]
+    return jsonify({
+        "name": location,
+        "water_temp": "65°F",
+        "water_level": "Normal",
+        "fishing_conditions": "Good",
+        "recent_catches": [
+            {"species": "Bass", "count": 5},
+            {"species": "Trout", "count": 3}
+        ],
+        "best_times": ["Early morning", "Evening"],
+        "regulations": {
+            "season": "Open year-round",
+            "limits": "5 fish per day",
+            "size_limit": "12 inches minimum"
+        },
+        "user_catches": user_catches
+    })
+
+def get_gps_for_location(location):
+    # Try to get GPS from existing plans/catches first
+    try:
+        with open(LOG_PATH, "r") as f:
+            data = json.load(f)
+    except:
+        data = []
+    for entry in data:
+        if entry.get("location") == location and entry.get("gps") and len(entry["gps"]) == 2:
+            return entry["gps"]
+    # Otherwise, use Nominatim
+    url = "https://nominatim.openstreetmap.org/search"
+    params = {"q": location + ", New Hampshire, USA", "format": "json", "limit": 1}
+    try:
+        resp = requests.get(url, params=params, headers={"User-Agent": "fishing-log-app"})
+        resp.raise_for_status()
+        results = resp.json()
+        if results:
+            lat = float(results[0]["lat"])
+            lon = float(results[0]["lon"])
+            return [lat, lon]
+    except Exception as e:
+        print(f"Error geocoding {location}: {e}")
+    return None
+
+@app.route("/get-events")
+def get_events():
+    try:
+        with open(LOG_PATH, "r") as f:
+            data = json.load(f)
+    except:
+        data = []
+    events = []
+    for item in data:
+        gps = item.get("gps")
+        if not gps and item.get("location"):
+            gps = get_gps_for_location(item["location"])
+            if gps:
+                item["gps"] = gps
+                # Save GPS back to file for future use
+                with open(LOG_PATH, "w") as f:
+                    json.dump(data, f, indent=2)
+        if item.get("type") == "plan":
+            events.append({
+                "title": f"Fishing at {item['location']}",
+                "start": item["date"],
+                "extendedProps": {
+                    "type": "plan",
+                    "location": item["location"],
+                    "notes": item.get("notes", ""),
+                    "gps": gps
+                }
+            })
+        elif "date" in item:  # Regular catch
+            events.append({
+                "title": f"Catch at {item['location']}",
+                "start": item["date"],
+                "backgroundColor": "#28a745",
+                "extendedProps": {
+                    "type": "catch",
+                    "location": item.get("location"),
+                    "gps": gps
+                }
+            })
+    return jsonify(events)
 
 def convert_fractions(obj):
     if isinstance(obj, Fraction):

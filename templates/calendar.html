@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Fishing Calendar</title>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
+    <style>
+        body {
+            font-family: sans-serif;
+            background: #f0f0f0;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .calendar-container {
+            margin-top: 20px;
+        }
+        .fc-event {
+            cursor: pointer;
+        }
+        .lake-info {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            display: none;
+        }
+        .lake-info h3 {
+            margin-top: 0;
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #007bff;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .add-plan-form {
+            margin-bottom: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        .add-plan-form input, .add-plan-form select, .add-plan-form textarea {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .add-plan-form button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .add-plan-form button:hover {
+            background: #0056b3;
+        }
+        #leafletMap {
+            width: 350px !important;
+            height: 300px !important;
+            border-radius: 10px;
+            overflow: hidden;
+            box-sizing: border-box;
+        }
+        #eventModalContent {
+            overflow: hidden;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-link">&larr; Back to Home</a>
+        <h1>Fishing Calendar</h1>
+        
+        <div class="add-plan-form">
+            <h3>Add Fishing Plan</h3>
+            <form method="POST" action="/add-fishing-plan">
+                <select name="location" required>
+                    <option value="">Select Location</option>
+                    {% for location in locations %}
+                    <option value="{{ location }}">{{ location }}</option>
+                    {% endfor %}
+                </select>
+                <input type="date" name="date" required>
+                <textarea name="notes" placeholder="Add notes about your fishing plan..."></textarea>
+                <button type="submit">Add Plan</button>
+            </form>
+        </div>
+
+        <div class="calendar-container">
+            <div id="calendar"></div>
+        </div>
+
+        <div class="lake-info" id="lakeInfo">
+            <h3>Lake Information</h3>
+            <div id="lakeInfoContent"></div>
+        </div>
+    </div>
+
+    <div id="eventModal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.7); align-items:center; justify-content:center; z-index:9999;">
+        <div id="eventModalContent" style="background:#fff; border-radius:12px; max-width:90vw; max-height:90vh; padding:24px; box-shadow:0 2px 24px #0005; position:relative; display:flex; flex-direction:column; align-items:center; min-width:340px; overflow:hidden;">
+            <span id="closeEventModal" style="position:absolute; top:18px; right:24px; font-size:2.2em; color:#333; cursor:pointer;">&times;</span>
+            <h2 id="eventTitle"></h2>
+            <div id="eventMap" style="width:350px; height:300px; border-radius:10px; margin-bottom:18px; overflow:hidden;"></div>
+            <div id="eventDetails"></div>
+            <a id="logCatchBtn" href="#" style="display:none; margin-top:18px; background:#1976d2; color:white; padding:12px 28px; border-radius:8px; font-weight:600; text-decoration:none; font-size:1.1em;">Log Catch</a>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const calendarEl = document.getElementById('calendar');
+            const eventModal = document.getElementById('eventModal');
+            const closeEventModal = document.getElementById('closeEventModal');
+            const eventTitle = document.getElementById('eventTitle');
+            const eventMapDiv = document.getElementById('eventMap');
+            const eventDetails = document.getElementById('eventDetails');
+            const logCatchBtn = document.getElementById('logCatchBtn');
+            let eventMap = null;
+            let eventMarker = null;
+
+            closeEventModal.onclick = function() {
+                eventModal.style.display = 'none';
+                if (eventMap) {
+                    eventMap.remove();
+                    eventMap = null;
+                }
+                eventMapDiv.innerHTML = "";
+            };
+
+            const calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                events: '/get-events',
+                eventClick: function(info) {
+                    const props = info.event.extendedProps;
+                    eventTitle.textContent = info.event.title;
+                    eventDetails.innerHTML = '';
+                    logCatchBtn.style.display = 'none';
+                    if (props.gps && props.gps.length === 2) {
+                        setTimeout(function() {
+                            eventMapDiv.innerHTML = "<div id='leafletMap' style='width:350px; height:300px;'></div>";
+                            eventMap = L.map('leafletMap').setView([props.gps[0], props.gps[1]], 13);
+                            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                                attribution: '&copy; OpenStreetMap contributors'
+                            }).addTo(eventMap);
+                            eventMarker = L.marker([props.gps[0], props.gps[1]]).addTo(eventMap);
+                        }, 100);
+                    } else {
+                        eventMapDiv.innerHTML = '<div style="color:#c00;">No GPS location found for this spot.</div>';
+                    }
+                    if (props.type === 'plan') {
+                        logCatchBtn.style.display = 'inline-block';
+                        logCatchBtn.href = `/log?location=${encodeURIComponent(props.location)}&date=${encodeURIComponent(info.event.startStr)}&lat=${props.gps ? props.gps[0] : ''}&lon=${props.gps ? props.gps[1] : ''}`;
+                        eventDetails.innerHTML = `<div style='margin-bottom:8px;'><strong>Planned Trip</strong></div><div><strong>Location:</strong> ${props.location}</div><div><strong>Date:</strong> ${info.event.startStr}</div>`;
+                    } else if (props.type === 'catch') {
+                        eventDetails.innerHTML = `<div><strong>Catch at:</strong> ${props.location}</div><div><strong>Date:</strong> ${info.event.startStr}</div>`;
+                    }
+                    eventModal.style.display = 'flex';
+                }
+            });
+            calendar.render();
+        });
+    </script>
+</body>
+</html> 

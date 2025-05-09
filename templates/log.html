@@ -4,6 +4,8 @@
     <title>Fishing Trip</title>
     <meta charset="utf-8">
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
     <style>
         body {
             font-family: sans-serif;
@@ -76,15 +78,27 @@
         </div>
     </div>
 
-    {% set fallback_used = false %}
-    {% if catches|length == 0 or (map_center[0] == 43.0362 and map_center[1] == -72.1147) %}
-        {% set fallback_used = true %}
-    {% endif %}
-    {% if fallback_used %}
-    <div style="background:#fff3cd;color:#856404;padding:12px;border-radius:6px;margin-bottom:16px;border:1px solid #ffeeba;">
-        <strong>Warning:</strong> No GPS found in photo. Pin location is set to map center. You can drag the pin to the correct spot before logging your catch.
+    <!-- Trip Summary Card -->
+    <div style="background:#e3f2fd;padding:18px 24px;border-radius:12px;box-shadow:0 2px 8px #0001;margin:24px 0 8px 0;display:flex;gap:32px;flex-wrap:wrap;align-items:center;">
+        <div><strong>Total Catches:</strong> {{ trip_stats.total_catches }}</div>
+        <div><strong>Most Common Species:</strong> {{ trip_stats.most_common_species or 'N/A' }}</div>
+        <div><strong>Total Weight:</strong> {{ trip_stats.total_weight|round(2) }} lbs</div>
+        <div>
+            <strong>Biggest Fish:</strong>
+            {% if trip_stats.biggest_fish %}
+                {{ trip_stats.biggest_fish.species }} ({{ trip_stats.biggest_fish.length }}"{% if trip_stats.biggest_fish.weight %}, {{ trip_stats.biggest_fish.weight }} lbs{% endif %})
+            {% else %}
+                N/A
+            {% endif %}
+        </div>
     </div>
-    {% endif %}
+
+    <div id="gps-notification" style="display:none;"></div>
+
+    <!-- Map Toggle -->
+    <div style="margin: 18px 0 0 0;">
+        <button id="toggleMapBtn" style="padding:8px 18px;border-radius:6px;background:#1976d2;color:white;font-weight:600;border:none;cursor:pointer;">Show All Catches</button>
+    </div>
     <div id="map" class="map"></div>
 
     <form class="catch-form" action="/add-catch?location={{ location }}&date={{ date }}" method="POST" enctype="multipart/form-data" onsubmit="updateLatLonInputs()">
@@ -136,28 +150,39 @@
 
     <h3 style="margin-top: 30px;">Catches</h3>
     {% for c in catches %}
-    <div class="catch-entry">
-        <strong>{{ c.species }}</strong> — {{ c.length }}" / {{ c.weight }} lbs on {{ c.bait }}
-        {% if c.weather %}<br><span style="color:#888;">Weather: {{ c.weather }}</span>{% endif %}
-        {% if c.notes %}<br><span style="color:#888;">Notes: {{ c.notes }}</span>{% endif %}
+    <div class="catch-entry" id="catch-{{ c.id }}" style="background: #fff; box-shadow: 0 2px 8px #0001; border-radius: 14px; padding: 18px 20px 24px 20px; margin-top: 24px; display: flex; flex-direction: column; align-items: flex-start; max-width: 350px;">
+        <div style="font-size:1.25em; font-weight:700; margin-bottom: 4px; letter-spacing:0.01em;">{{ c.species }}</div>
+        <div style="color:#222; font-size:1.08em; margin-bottom: 2px;">{{ c.length }}" / {{ c.weight }} lbs <span style="color:#666;">on</span> <span style="font-weight:500;">{{ c.bait }}</span></div>
+        {% if c.weather_data %}
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;">
+            <img src="https://openweathermap.org/img/wn/{{ c.weather_data.weather_icon }}@2x.png" alt="weather icon" style="width:38px;height:38px;vertical-align:middle;">
+            <span style="font-size:1.05em;">{{ c.weather_data.temperature|round(1) }}°F, {{ c.weather_data.weather_description|capitalize }}</span>
+        </div>
+        {% endif %}
+        {% if c.weather %}<div style="color:#888; font-size:0.98em; margin-bottom:2px;">Weather (manual): {{ c.weather }}</div>{% endif %}
+        {% if c.notes %}<div style="color:#888; font-size:0.98em; margin-bottom:2px;">Notes: {{ c.notes }}</div>{% endif %}
         {% if c.photo %}
-        <img src="{{ url_for('static', filename='uploads/' ~ c.photo) }}" onclick="openModal(this.src)" style="max-width:180px;border-radius:8px;box-shadow:0 2px 8px #0002;margin-top:8px;">
+        <img src="{{ url_for('static', filename='uploads/' ~ c.photo) }}" id="catch-photo-{{ c.id }}" style="max-width:100%;border-radius:12px;box-shadow:0 2px 8px #0002;margin:14px 0 10px 0;cursor:pointer;" onclick="openModal(this.src)">
         {% endif %}
         {% if c.id %}
-        <a href="/edit-catch/{{ c.id }}">Edit</a>
-        <form action="/delete-catch/{{ c.id }}" method="POST" style="display:inline;">
-            <button type="submit" style="background:#dc3545;color:white;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;margin-left:8px;">Delete</button>
-        </form>
+        <div style="display: flex; gap: 12px; margin-top: 8px; align-items: center; width:100%;">
+            <a href="/edit-catch/{{ c.id }}" style="background:#1976d2;color:white;padding:10px 0;border:none;border-radius:6px;text-decoration:none;font-weight:600;font-size:1em;transition:background 0.2s;display:inline-block;width:48%;text-align:center;box-shadow:0 1px 4px #0001;">Edit</a>
+            <form action="/delete-catch/{{ c.id }}" method="POST" style="display:inline; margin:0; width:48%;">
+                <button type="submit" style="background:#dc3545;color:white;border:none;padding:10px 0;border-radius:6px;cursor:pointer;font-size:1em;display:inline-block;width:100%;font-weight:600;box-shadow:0 1px 4px #0001;">Delete</button>
+            </form>
+        </div>
         {% endif %}
     </div>
     {% endfor %}
 </div>
 
-<div id="imgModal" onclick="this.style.display='none'" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background-color:rgba(0,0,0,0.8); align-items:center; justify-content:center; z-index:9999;">
-    <img id="modalImg" style="max-width:90%; max-height:90%; border: 4px solid white; box-shadow: 0 0 20px black;">
+<div id="imgModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background-color:rgba(0,0,0,0.8); align-items:center; justify-content:center; z-index:9999;">
+    <span id="closeModalBtn" onclick="closeModal()" style="position:absolute;top:30px;right:40px;font-size:2.5em;color:white;cursor:pointer;z-index:10001;">&times;</span>
+    <img id="modalImg" style="max-width:90%; max-height:90%; border: 4px solid white; box-shadow: 0 0 20px black; border-radius:12px;">
 </div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script>
     let marker = null;
     const map = L.map('map').setView([{{ map_center[0]|float }}, {{ map_center[1]|float }}], 14);
@@ -165,9 +190,74 @@
         attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
-    // Only add the draggable marker when the form is focused
+    // Marker icons
+    const blueIcon = new L.Icon({
+        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
+        shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41]
+    });
+    const grayIcon = new L.Icon({
+        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-grey.png',
+        shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41]
+    });
+
+    let showAll = false;
+    let catchMarkers = [];
+    let markerCluster = L.markerClusterGroup();
+    map.addLayer(markerCluster);
+
+    function addCatchMarkers(catchList, highlightTrip) {
+        // Remove old markers
+        catchMarkers.forEach(m => markerCluster.removeLayer(m));
+        catchMarkers = [];
+        markerCluster.clearLayers();
+        catchList.forEach(c => {
+            if (c.gps && c.gps.length === 2) {
+                let icon = highlightTrip && c.location === "{{ location }}" && c.date === "{{ date }}" ? blueIcon : grayIcon;
+                let m = L.marker([c.gps[0], c.gps[1]], {icon: icon})
+                    .bindPopup(`
+                        <div style='min-width:220px;max-width:260px;padding:6px 2px 2px 2px;'>
+                            <div style='font-weight:700;font-size:1.1em;margin-bottom:2px;'>${c.species}</div>
+                            <div style='color:#222;font-size:1em;margin-bottom:2px;'>${c.length} in, ${c.weight || 'N/A'} lbs</div>
+                            <div style='color:#555;font-size:0.97em;margin-bottom:2px;'>${c.bait}</div>
+                            ${c.weather_data ? `<div style='display:flex;align-items:center;gap:8px;margin-bottom:2px;'><img src='https://openweathermap.org/img/wn/${c.weather_data.weather_icon}@2x.png' alt='weather icon' style='width:32px;height:32px;vertical-align:middle;'><span style='font-size:1em;'>${c.weather_data.temperature.toFixed(1)}°F, ${c.weather_data.weather_description.charAt(0).toUpperCase() + c.weather_data.weather_description.slice(1)}</span></div>` : ''}
+                            ${c.weather ? `<div style='color:#888;font-size:0.95em;margin-bottom:2px;'>Weather (manual): ${c.weather}</div>` : ''}
+                            ${c.notes ? `<div style='color:#888;font-size:0.95em;margin-bottom:2px;'>Notes: ${c.notes}</div>` : ''}
+                            <img src='/static/uploads/${c.photo}' style='max-width:100%;border-radius:10px;box-shadow:0 2px 8px #0002;margin-top:8px;display:block;cursor:pointer;' onclick='scrollToCatch("catch-${c.id}")'>
+                        </div>
+                    `);
+                markerCluster.addLayer(m);
+                catchMarkers.push(m);
+            }
+        });
+    }
+
+    // Initial markers: only this trip
+    addCatchMarkers({{ catches|tojson }}, false);
+
+    document.getElementById('toggleMapBtn').addEventListener('click', function() {
+        showAll = !showAll;
+        if (showAll) {
+            addCatchMarkers({{ all_catches|tojson }}, true);
+            this.textContent = 'Show This Trip Only';
+        } else {
+            addCatchMarkers({{ catches|tojson }}, false);
+            this.textContent = 'Show All Catches';
+        }
+    });
+
+    // Only add the draggable marker when the photo input is focused
     function addDraggableMarker() {
-        if (marker) return; // Only add once
+        if (marker) {
+            map.removeLayer(marker);
+        }
         marker = L.marker([{{ map_center[0]|float }}, {{ map_center[1]|float }}], {draggable:true}).addTo(map);
         marker.bindTooltip('Drag the marker to set catch location', {permanent: false, direction: 'top'});
         marker.on('dragend', function(e) {
@@ -177,10 +267,8 @@
         });
     }
 
-    // Add event listeners to form fields to trigger marker creation
-    document.querySelectorAll('.catch-form input, .catch-form select, .catch-form textarea').forEach(el => {
-        el.addEventListener('focus', addDraggableMarker, {once: true});
-    });
+    // Add event listener only to the photo input
+    document.querySelector('input[type="file"]').addEventListener('focus', addDraggableMarker, {once: true});
 
     function updateLatLonInputs() {
         if (marker) {
@@ -190,13 +278,6 @@
         }
     }
 
-    {% for c in catches %}
-    {% if c.gps and c.gps|length == 2 %}
-    L.marker([{{ c.gps[0]|float }}, {{ c.gps[1]|float }}])
-        .addTo(map)
-        .bindPopup(`<b>{{ c.species }}</b><br>{{ c.length }} in, {{ c.weight }} lbs<br>{{ c.bait }}<br>{% if c.weather %}Weather: {{ c.weather }}<br>{% endif %}{% if c.notes %}Notes: {{ c.notes }}<br>{% endif %}<img src='{{ url_for('static', filename='uploads/' ~ c.photo) }}' style='max-width:160px;border-radius:8px;box-shadow:0 2px 8px #0002;margin-top:8px;'>`);
-    {% endif %}
-    {% endfor %}
     function toggleCustomWeight(value) {
         const customInput = document.getElementById('custom-weight');
         if (value === 'other') {
@@ -207,10 +288,45 @@
             customInput.required = false;
         }
     }
+
     function openModal(src) {
-        document.getElementById('modalImg').src = src;
-        document.getElementById('imgModal').style.display = 'flex';
+        var modal = document.getElementById('imgModal');
+        var modalImg = document.getElementById('modalImg');
+        modal.style.display = 'flex';
+        modalImg.src = src;
     }
+
+    function closeModal() {
+        document.getElementById('imgModal').style.display = 'none';
+    }
+
+    function scrollToCatch(id) {
+        var el = document.getElementById(id);
+        if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.style.transition = 'box-shadow 0.4s, border 0.4s';
+            el.style.boxShadow = '0 0 0 4px #1976d2, 0 2px 8px #0001';
+            el.style.border = '2px solid #1976d2';
+            setTimeout(function() {
+                el.style.boxShadow = '0 2px 8px #0001';
+                el.style.border = 'none';
+            }, 1200);
+        }
+    }
+
+    // GPS notification logic
+    const gpsNotification = document.getElementById('gps-notification');
+    const photoInput = document.querySelector('input[type="file"]');
+    photoInput.addEventListener('change', function() {
+        let fallback = {{ 'true' if fallback_used else 'false' }};
+        if (fallback) {
+            gpsNotification.innerHTML = '<div style="background:#fff3cd;color:#856404;padding:12px;border-radius:6px;margin-bottom:16px;border:1px solid #ffeeba;"><strong>No GPS found in photo.</strong> Please drag the pin to the correct location.</div>';
+        } else {
+            gpsNotification.innerHTML = '<div style="background:#d4edda;color:#155724;padding:12px;border-radius:6px;margin-bottom:16px;border:1px solid #c3e6cb;"><strong>GPS coordinates found</strong> and pin placed on map.</div>';
+        }
+        gpsNotification.style.display = 'block';
+        setTimeout(() => { gpsNotification.style.display = 'none'; }, 3000);
+    });
 </script>
 </body>
 </html>

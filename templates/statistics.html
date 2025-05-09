@@ -58,6 +58,16 @@
             color: #007bff;
             font-weight: bold;
         }
+        .nav {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .nav a {
+            text-decoration: none;
+            color: #007bff;
+            font-weight: bold;
+            margin: 0 10px;
+        }
         @media (max-width: 768px) {
             .container {
                 padding: 10px;
@@ -74,6 +84,11 @@
 </head>
 <body>
     <div class="container">
+        <div class="nav">
+            <a href="/">Start New Trip</a>
+            <a href="/trips">View Past Trips</a>
+        </div>
+        
         <h2>Fishing Statistics</h2>
         
         <div class="stats-grid">
@@ -82,12 +97,12 @@
                 <p>{{ stats.total_catches }}</p>
             </div>
             <div class="stat-card">
-                <h3>Unique Species</h3>
-                <p>{{ stats.species_count|length }}</p>
+                <h3>Total Weight</h3>
+                <p>{{ "%.1f"|format(stats.total_weight) }} lbs</p>
             </div>
             <div class="stat-card">
-                <h3>Most Common Species</h3>
-                <p>{{ stats.species_count|dictsort(by='value')|last|first }}</p>
+                <h3>Unique Species</h3>
+                <p>{{ stats.species_count|length }}</p>
             </div>
         </div>
 
@@ -97,7 +112,7 @@
         </div>
 
         <div class="chart-container">
-            <h2>Time of Day Distribution</h2>
+            <h2>Time of Day Analysis</h2>
             <canvas id="timeChart"></canvas>
         </div>
 
@@ -109,6 +124,16 @@
         <div class="chart-container">
             <h2>Bait Effectiveness</h2>
             <canvas id="baitChart"></canvas>
+        </div>
+
+        <div class="stats-grid">
+            <h2>Average Size by Species</h2>
+            {% for species, data in stats.average_size.items() %}
+            <div class="stat-card">
+                <h3>{{ species }}</h3>
+                <p>{{ "%.1f"|format(data.average) }} in</p>
+            </div>
+            {% endfor %}
         </div>
     </div>
 
