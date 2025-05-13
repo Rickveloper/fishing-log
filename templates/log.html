@@ -149,31 +149,38 @@
     </form>
 
     <h3 style="margin-top: 30px;">Catches</h3>
-    {% for c in catches %}
-    <div class="catch-entry" id="catch-{{ c.id }}" style="background: #fff; box-shadow: 0 2px 8px #0001; border-radius: 14px; padding: 18px 20px 24px 20px; margin-top: 24px; display: flex; flex-direction: column; align-items: flex-start; max-width: 350px;">
-        <div style="font-size:1.25em; font-weight:700; margin-bottom: 4px; letter-spacing:0.01em;">{{ c.species }}</div>
-        <div style="color:#222; font-size:1.08em; margin-bottom: 2px;">{{ c.length }}" / {{ c.weight }} lbs <span style="color:#666;">on</span> <span style="font-weight:500;">{{ c.bait }}</span></div>
-        {% if c.weather_data %}
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;">
-            <img src="https://openweathermap.org/img/wn/{{ c.weather_data.weather_icon }}@2x.png" alt="weather icon" style="width:38px;height:38px;vertical-align:middle;">
-            <span style="font-size:1.05em;">{{ c.weather_data.temperature|round(1) }}°F, {{ c.weather_data.weather_description|capitalize }}</span>
+    {% set valid_catches = catches | selectattr('species') | selectattr('weight') | selectattr('bait') | selectattr('type', '!=', 'plan') | list %}
+    {% if valid_catches|length == 0 %}
+        <div style="background:#fff3cd;color:#856404;padding:18px 24px;border-radius:10px;margin-top:18px;font-size:1.15em;text-align:center;">
+            No catches logged yet! Add your first catch above.
         </div>
-        {% endif %}
-        {% if c.weather %}<div style="color:#888; font-size:0.98em; margin-bottom:2px;">Weather (manual): {{ c.weather }}</div>{% endif %}
-        {% if c.notes %}<div style="color:#888; font-size:0.98em; margin-bottom:2px;">Notes: {{ c.notes }}</div>{% endif %}
-        {% if c.photo %}
-        <img src="{{ url_for('static', filename='uploads/' ~ c.photo) }}" id="catch-photo-{{ c.id }}" style="max-width:100%;border-radius:12px;box-shadow:0 2px 8px #0002;margin:14px 0 10px 0;cursor:pointer;" onclick="openModal(this.src)">
-        {% endif %}
-        {% if c.id %}
-        <div style="display: flex; gap: 12px; margin-top: 8px; align-items: center; width:100%;">
-            <a href="/edit-catch/{{ c.id }}" style="background:#1976d2;color:white;padding:10px 0;border:none;border-radius:6px;text-decoration:none;font-weight:600;font-size:1em;transition:background 0.2s;display:inline-block;width:48%;text-align:center;box-shadow:0 1px 4px #0001;">Edit</a>
-            <form action="/delete-catch/{{ c.id }}" method="POST" style="display:inline; margin:0; width:48%;">
-                <button type="submit" style="background:#dc3545;color:white;border:none;padding:10px 0;border-radius:6px;cursor:pointer;font-size:1em;display:inline-block;width:100%;font-weight:600;box-shadow:0 1px 4px #0001;">Delete</button>
-            </form>
+    {% else %}
+        {% for c in valid_catches %}
+        <div class="catch-entry" id="catch-{{ c.id }}" style="background: #fff; box-shadow: 0 2px 8px #0001; border-radius: 14px; padding: 18px 20px 24px 20px; margin-top: 24px; display: flex; flex-direction: column; align-items: flex-start; max-width: 350px;">
+            <div style="font-size:1.25em; font-weight:700; margin-bottom: 4px; letter-spacing:0.01em;">{{ c.species }}</div>
+            <div style="color:#222; font-size:1.08em; margin-bottom: 2px;">{{ c.length }}" / {{ c.weight }} lbs <span style="color:#666;">on</span> <span style="font-weight:500;">{{ c.bait }}</span></div>
+            {% if c.weather_data %}
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;">
+                <img src="https://openweathermap.org/img/wn/{{ c.weather_data.weather_icon }}@2x.png" alt="weather icon" style="width:38px;height:38px;vertical-align:middle;">
+                <span style="font-size:1.05em;">{{ c.weather_data.temperature|round(1) }}°F, {{ c.weather_data.weather_description|capitalize }}</span>
+            </div>
+            {% endif %}
+            {% if c.weather %}<div style="color:#888; font-size:0.98em; margin-bottom:2px;">Weather (manual): {{ c.weather }}</div>{% endif %}
+            {% if c.notes %}<div style="color:#888; font-size:0.98em; margin-bottom:2px;">Notes: {{ c.notes }}</div>{% endif %}
+            {% if c.photo %}
+            <img src="{{ url_for('static', filename='uploads/' ~ c.photo) }}" id="catch-photo-{{ c.id }}" style="max-width:100%;border-radius:12px;box-shadow:0 2px 8px #0002;margin:14px 0 10px 0;cursor:pointer;" onclick="openModal(this.src)">
+            {% endif %}
+            {% if c.id %}
+            <div style="display: flex; gap: 12px; margin-top: 8px; align-items: center; width:100%;">
+                <a href="/edit-catch/{{ c.id }}" style="background:#1976d2;color:white;padding:10px 0;border:none;border-radius:6px;text-decoration:none;font-weight:600;font-size:1em;transition:background 0.2s;display:inline-block;width:48%;text-align:center;box-shadow:0 1px 4px #0001;">Edit</a>
+                <form action="/delete-catch/{{ c.id }}" method="POST" style="display:inline; margin:0; width:48%;">
+                    <button type="submit" style="background:#dc3545;color:white;border:none;padding:10px 0;border-radius:6px;cursor:pointer;font-size:1em;display:inline-block;width:100%;font-weight:600;box-shadow:0 1px 4px #0001;">Delete</button>
+                </form>
+            </div>
+            {% endif %}
         </div>
-        {% endif %}
-    </div>
-    {% endfor %}
+        {% endfor %}
+    {% endif %}
 </div>
 
 <div id="imgModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background-color:rgba(0,0,0,0.8); align-items:center; justify-content:center; z-index:9999;">

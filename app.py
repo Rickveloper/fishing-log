@@ -46,6 +46,9 @@ def log():
     else:
         catches = all_catches
 
+    # Only consider valid catches (not plans, and with required fields)
+    valid_catches = [c for c in catches if c.get('type') != 'plan' and c.get('species') and c.get('weight') and c.get('bait')]
+
     # Map center logic: use URL lat/lon, first valid GPS, or fallback
     if lat and lon:
         map_center = [float(lat), float(lon)]
@@ -53,9 +56,9 @@ def log():
         first_with_gps = next((c for c in catches if c.get("gps") and len(c["gps"]) == 2), None)
         map_center = first_with_gps["gps"] if first_with_gps else [43.0362, -72.1147]
 
-    # Trip summary stats
+    # Trip summary stats (use only valid catches)
     trip_stats = {
-        'total_catches': len(catches),
+        'total_catches': len(valid_catches),
         'biggest_fish': None,
         'most_common_species': None,
         'total_weight': 0
@@ -63,7 +66,7 @@ def log():
     # Find biggest fish and most common species
     max_length = 0
     species_count = {}
-    for c in catches:
+    for c in valid_catches:
         # Biggest fish by length
         try:
             l = float(c.get('length', 0))
@@ -265,9 +268,12 @@ def statistics():
     except:
         catches = []
 
+    # Only consider valid catches (not plans, and with required fields)
+    valid_catches = [c for c in catches if c.get('type') != 'plan' and c.get('species') and c.get('weight') and c.get('bait')]
+
     # Initialize statistics
     stats = {
-        'total_catches': len(catches),
+        'total_catches': len(valid_catches),
         'species_count': {},
         'time_of_day': {
             'morning': 0,    # 5-11
@@ -281,7 +287,7 @@ def statistics():
         'total_weight': 0
     }
 
-    for catch in catches:
+    for catch in valid_catches:
         # Count species
         species = catch.get('species')
         if species:

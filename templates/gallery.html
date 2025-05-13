@@ -46,8 +46,14 @@
 </head>
 <body>
     <div class="container">
-        <a href="/log" class="back-link">&larr; Back to Log</a>
+        <a href="/" class="back-link">&larr; Back to Home</a>
         <h2>Catch Gallery</h2>
+        {% set photos = catches | selectattr('photo') | list %}
+        {% if photos|length == 0 %}
+            <div style="background:#fff3cd;color:#856404;padding:18px 24px;border-radius:10px;margin-top:18px;font-size:1.15em;text-align:center;">
+                No photos uploaded yet! Go catch something awesome 🐟
+            </div>
+        {% else %}
         <div class="gallery-grid">
             {% for c in catches if c.photo %}
             <div class="gallery-item" onclick="openGalleryModal({{ loop.index0 }})">
@@ -60,6 +66,7 @@
             </div>
             {% endfor %}
         </div>
+        {% endif %}
     </div>
     <div id="galleryModal" onclick="closeGalleryModal(event)">
         <div class="modal-content" onclick="event.stopPropagation()">
