@@ -1,5 +1,53 @@
-from flask import Flask, render_template, request, redirect, url_for, jsonify
+import sys
 import os
+print("app.py started")
+print("sys.argv:", sys.argv)
+print("sys.executable:", sys.executable)
+print("sys.path:", sys.path)
+
+# Always use user data directory for data storage
+user_data_dir = os.path.expanduser('~/fishing-log-data')
+print("Using user data directory:", user_data_dir)
+os.makedirs(user_data_dir, exist_ok=True)
+LOG_PATH = os.path.join(user_data_dir, 'catches.json')
+UPLOAD_FOLDER = os.path.join(user_data_dir, 'uploads')
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+if getattr(sys, 'frozen', False):
+    base_dir = os.path.dirname(sys.executable)
+    if sys.platform == 'darwin':
+        base_dir = os.path.join(base_dir, '..', 'Resources')
+    template_folder = os.path.join(base_dir, 'templates')
+    static_folder = os.path.join(base_dir, 'static')
+    # Copy initial catches.json if it doesn't exist
+    initial_log_path = os.path.join(base_dir, 'catches.json')
+    print("Initial log path:", initial_log_path)
+    print("Final log path:", LOG_PATH)
+    if not os.path.exists(LOG_PATH) and os.path.exists(initial_log_path):
+        print("Copying initial catches.json")
+        import shutil
+        shutil.copy(initial_log_path, LOG_PATH)
+    # Copy initial uploads if not present
+    initial_uploads = os.path.join(base_dir, 'static', 'uploads')
+    if os.path.exists(initial_uploads) and not os.listdir(UPLOAD_FOLDER):
+        print("Copying initial uploads")
+        import shutil
+        for f in os.listdir(initial_uploads):
+            shutil.copy(os.path.join(initial_uploads, f), UPLOAD_FOLDER)
+else:
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    template_folder = os.path.join(base_dir, 'templates')
+    static_folder = os.path.join(base_dir, 'static')
+
+print("STATIC FOLDER:", static_folder)
+try:
+    print("STATIC FILES:", os.listdir(static_folder))
+except Exception as e:
+    print("Could not list static files:", e)
+
+print(">>> FINAL LOG_PATH:", LOG_PATH)
+
+from flask import Flask, render_template, request, redirect, url_for, jsonify
 import json
 from datetime import datetime
 from werkzeug.utils import secure_filename
@@ -10,14 +58,21 @@ from fractions import Fraction
 from weather_service import WeatherService
 import requests
 
-app = Flask(__name__)
+app = Flask(
+    __name__,
+    template_folder=template_folder,
+    static_folder=static_folder,
+    static_url_path='/static'
+)
 app.debug = True  # Enable debug mode
-UPLOAD_FOLDER = os.path.join('static', 'uploads')
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-LOG_PATH = 'catches.json'
+
 weather_service = WeatherService()
 
-@app.route("/", methods=["GET", "POST"])
+@app.route("/")
+def splash():
+    return render_template("splash.html")
+
+@app.route("/home", methods=["GET", "POST"])
 def landing():
     if request.method == "POST":
         location = request.form["location"]
@@ -47,7 +102,10 @@ def log():
         catches = all_catches
 
     # Only consider valid catches (not plans, and with required fields)
-    valid_catches = [c for c in catches if c.get('type') != 'plan' and c.get('species') and c.get('weight') and c.get('bait')]
+    valid_catches = [
+        c for c in catches
+        if c.get('type') != 'plan' and c.get('species') and c.get('length') and c.get('bait')
+    ]
 
     # Map center logic: use URL lat/lon, first valid GPS, or fallback
     if lat and lon:
@@ -85,17 +143,18 @@ def log():
             species_count[s] = species_count.get(s, 0) + 1
         # Total weight
         try:
-            w = float(c.get('weight', 0))
+            w = float(c.get('weight', 0) or 0)
             trip_stats['total_weight'] += w
         except:
             pass
     if species_count:
         trip_stats['most_common_species'] = max(species_count, key=species_count.get)
 
-    return render_template("log.html", location=location, date=date, catches=catches, map_center=map_center, trip_stats=trip_stats, all_catches=all_catches)
+    return render_template("log.html", location=location, date=date, catches=catches, valid_catches=valid_catches, map_center=map_center, trip_stats=trip_stats, all_catches=all_catches)
 
 @app.route("/add-catch", methods=["POST"])
 def add_catch():
+    print("ADD CATCH: LOG_PATH =", LOG_PATH)
     location = request.args.get("location")
     date = request.args.get("date")
     lat = request.form.get("lat")
@@ -116,7 +175,9 @@ def add_catch():
     # Get weather data if coordinates are available
     weather_data = None
     if lat and lon:
+        print(f"Requesting weather for lat={lat}, lon={lon}")
         weather_data = weather_service.get_current_weather(float(lat), float(lon))
+        print(f"Weather data returned: {weather_data}")
 
     # Extract GPS data from EXIF
     gps_data = None
@@ -159,6 +220,7 @@ def add_catch():
         gps_data = [float(lat), float(lon)]
         gps_fallback = True
 
+    angler = request.form.get("angler")
     entry = {
         "id": str(uuid.uuid4()),
         "location": location,
@@ -173,7 +235,8 @@ def add_catch():
         "notes": notes,
         "photo": filename,
         "gps": gps_data,
-        "gps_fallback": gps_fallback
+        "gps_fallback": gps_fallback,
+        "angler": angler
     }
 
     try:
@@ -205,6 +268,7 @@ def edit_catch(catch_id):
         catch["bait"] = request.form.get("bait")
         catch["weather"] = request.form.get("weather")
         catch["notes"] = request.form.get("notes")
+        catch["angler"] = request.form.get("angler")
 
         with open(LOG_PATH, "w") as f:
             json.dump(data, f, indent=2)

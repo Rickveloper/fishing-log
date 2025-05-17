@@ -1,3 +1,4 @@
+{% include 'navbar.html' %}
 <!DOCTYPE html>
 <html>
 <head>
@@ -46,7 +47,6 @@
 </head>
 <body>
     <div class="container">
-        <a href="/" class="back-link">&larr; Back to Home</a>
         <h2>Catch Gallery</h2>
         {% set photos = catches | selectattr('photo') | list %}
         {% if photos|length == 0 %}

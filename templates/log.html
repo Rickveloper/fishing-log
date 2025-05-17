@@ -1,3 +1,4 @@
+{% include 'navbar.html' %}
 <!DOCTYPE html>
 <html>
 <head>
@@ -8,9 +9,9 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
     <style>
         body {
-            font-family: sans-serif;
-            padding: 20px;
-            background: #f0f0f0;
+            font-family: 'Segoe UI', 'Roboto', Arial, sans-serif;
+            padding: 0;
+            background: #f4f8fb;
             margin: 0;
         }
         .header {
@@ -18,53 +19,110 @@
             justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
+            margin-bottom: 24px;
         }
         .container {
-            max-width: 800px;
-            margin: auto;
+            max-width: 900px;
+            margin: 40px auto 0 auto;
+            padding: 32px 24px 48px 24px;
+            background: #fff;
+            border-radius: 18px;
+            box-shadow: 0 4px 24px #0002;
         }
         .map {
             height: 400px;
             margin-top: 20px;
-            border-radius: 8px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px #0001;
         }
         .catch-form {
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            margin-top: 20px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            background: #f7fbff;
+            padding: 28px 24px 24px 24px;
+            border-radius: 14px;
+            margin-top: 32px;
+            box-shadow: 0 2px 8px #1976d211;
+            border: 1.5px solid #e3f2fd;
         }
-        input, select {
-            padding: 10px;
+        input, select, textarea {
+            padding: 12px;
             width: 100%;
-            margin-bottom: 10px;
+            margin-bottom: 14px;
             box-sizing: border-box;
+            border-radius: 7px;
+            border: 1.5px solid #b3c6e0;
+            font-size: 1.05em;
+            background: #fafdff;
+            transition: border 0.2s;
+        }
+        input:focus, select:focus, textarea:focus {
+            border: 1.5px solid #1976d2;
+            outline: none;
         }
         button {
-            padding: 10px;
+            padding: 12px;
             width: 100%;
-            background: #007bff;
+            background: linear-gradient(90deg, #1976d2 60%, #42a5f5 100%);
             border: none;
             color: white;
             font-weight: bold;
+            font-size: 1.1em;
+            border-radius: 7px;
             cursor: pointer;
+            box-shadow: 0 2px 8px #1976d211;
+            transition: background 0.18s, box-shadow 0.18s, transform 0.18s;
         }
         button:hover {
-            background: #0056b3;
+            background: linear-gradient(90deg, #1256a3 60%, #1976d2 100%);
+            box-shadow: 0 4px 16px #1976d244;
+            transform: translateY(-2px) scale(1.03);
         }
         .catch-entry {
-            background: white;
-            padding: 10px;
-            border-radius: 8px;
-            margin-top: 10px;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+            background: #fafdff;
+            padding: 22px 20px 18px 20px;
+            border-radius: 16px;
+            margin-top: 28px;
+            box-shadow: 0 2px 12px #1976d211;
+            border: 1.5px solid #e3f2fd;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            max-width: 420px;
         }
-        img {
-            max-width: 200px;
-            display: block;
-            margin-top: 10px;
-            cursor: pointer;
+        .catch-entry img {
+            max-width: 100%;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px #0002;
+            margin: 14px 0 10px 0;
+        }
+        .catch-entry .catch-meta {
+            color: #1976d2;
+            font-size: 1.08em;
+            margin-bottom: 2px;
+            font-weight: 500;
+        }
+        .catch-entry .catch-angler {
+            color: #666;
+            font-size: 1.05em;
+            margin-bottom: 2px;
+        }
+        .catch-entry .catch-weather {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 2px;
+        }
+        .catch-entry .catch-notes {
+            color: #888;
+            font-size: 0.98em;
+            margin-bottom: 2px;
+        }
+        @media (max-width: 700px) {
+            .container {
+                padding: 8px 2vw 24px 2vw;
+            }
+            .catch-entry {
+                max-width: 100%;
+            }
         }
     </style>
 </head>
@@ -132,7 +190,7 @@
                 <option>{{ (i / 4)|round(2) }}</option>
             {% endfor %}
         </select>
-        <select name="weight" id="weight-select" required onchange="toggleCustomWeight(this.value)">
+        <select name="weight" id="weight-select" onchange="toggleCustomWeight(this.value)">
             <option disabled selected>Select Weight (lbs)</option>
             {% for i in range(1, 11) %}
                 <option>{{ i }}</option>
@@ -140,16 +198,54 @@
             <option value="other">Other</option>
         </select>
         <input type="text" name="custom_weight" id="custom-weight" placeholder="Enter custom weight (lbs)" style="display: none;" />
-        <input type="text" name="bait" placeholder="Bait Used" required />
+        <select name="angler" required>
+            <option disabled selected>Who caught it?</option>
+            <option>Rich</option>
+            <option>Jake</option>
+        </select>
+        <input type="text" name="bait" id="bait-input" placeholder="Bait Used" required list="bait-list" />
+        <datalist id="bait-list">
+            <!-- Chatterbaits -->
+            <option>Chatterbait - Black/Blue</option>
+            <option>Chatterbait - Green Pumpkin</option>
+            <option>Chatterbait - White</option>
+            <option>Chatterbait - Chartreuse</option>
+            <!-- Senkos -->
+            <option>Senko - Green Pumpkin</option>
+            <option>Senko - Black/Blue</option>
+            <option>Senko - Watermelon</option>
+            <option>Senko - White</option>
+            <!-- Spinnerbaits -->
+            <option>Spinnerbait - White</option>
+            <option>Spinnerbait - Chartreuse</option>
+            <option>Spinnerbait - Black/Blue</option>
+            <!-- Jigs -->
+            <option>Jig - Black/Blue</option>
+            <option>Jig - Green Pumpkin</option>
+            <option>Jig - Brown</option>
+            <!-- Crankbaits -->
+            <option>Crankbait - Red</option>
+            <option>Crankbait - Blue</option>
+            <option>Crankbait - Green</option>
+            <!-- Other -->
+            <option>Worm - Red</option>
+            <option>Worm - Black</option>
+            <option>Worm - Green Pumpkin</option>
+            <option>Swimbait - White</option>
+            <option>Swimbait - Chartreuse</option>
+        </datalist>
         <input type="text" name="weather" placeholder="Weather (optional)" />
         <textarea name="notes" placeholder="Notes (optional)" rows="2" style="width:100%;margin-bottom:10px;"></textarea>
         <label style="margin-bottom:6px; font-weight:bold;">Catch Photo (required):</label>
-        <input type="file" name="photo" accept="image/*" required style="margin-bottom:16px;" />
+        <input type="file" name="photo" id="photo-input" accept="image/*" required style="margin-bottom:16px;" onchange="previewPhoto(this)" />
+        <div id="photo-preview" style="display:none; margin-bottom:16px;">
+            <img id="preview-img" style="max-width:100%; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.1);" />
+            <div style="margin-top:8px; color:#666; font-size:0.9em;">Click the image to open in full size</div>
+        </div>
         <button type="submit">Log Catch</button>
     </form>
 
     <h3 style="margin-top: 30px;">Catches</h3>
-    {% set valid_catches = catches | selectattr('species') | selectattr('weight') | selectattr('bait') | selectattr('type', '!=', 'plan') | list %}
     {% if valid_catches|length == 0 %}
         <div style="background:#fff3cd;color:#856404;padding:18px 24px;border-radius:10px;margin-top:18px;font-size:1.15em;text-align:center;">
             No catches logged yet! Add your first catch above.
@@ -159,6 +255,7 @@
         <div class="catch-entry" id="catch-{{ c.id }}" style="background: #fff; box-shadow: 0 2px 8px #0001; border-radius: 14px; padding: 18px 20px 24px 20px; margin-top: 24px; display: flex; flex-direction: column; align-items: flex-start; max-width: 350px;">
             <div style="font-size:1.25em; font-weight:700; margin-bottom: 4px; letter-spacing:0.01em;">{{ c.species }}</div>
             <div style="color:#222; font-size:1.08em; margin-bottom: 2px;">{{ c.length }}" / {{ c.weight }} lbs <span style="color:#666;">on</span> <span style="font-weight:500;">{{ c.bait }}</span></div>
+            <div style="color:#666; font-size:1.05em; margin-bottom: 2px;">Caught by: <span style="font-weight:500;">{{ c.angler }}</span></div>
             {% if c.weather_data %}
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;">
                 <img src="https://openweathermap.org/img/wn/{{ c.weather_data.weather_icon }}@2x.png" alt="weather icon" style="width:38px;height:38px;vertical-align:middle;">
@@ -333,6 +430,43 @@
         }
         gpsNotification.style.display = 'block';
         setTimeout(() => { gpsNotification.style.display = 'none'; }, 3000);
+    });
+
+    function previewPhoto(input) {
+        const preview = document.getElementById('photo-preview');
+        const previewImg = document.getElementById('preview-img');
+        
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                previewImg.src = e.target.result;
+                preview.style.display = 'block';
+            }
+            
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+
+    // Add click handler for preview image
+    document.getElementById('preview-img').addEventListener('click', function() {
+        openModal(this.src);
+    });
+
+    // Smart bait menu
+    const baitInput = document.getElementById('bait-input');
+    baitInput.addEventListener('input', function() {
+        const value = this.value.toLowerCase();
+        const baitList = document.getElementById('bait-list');
+        
+        // Filter options based on input
+        Array.from(baitList.options).forEach(option => {
+            if (option.value.toLowerCase().includes(value)) {
+                option.style.display = '';
+            } else {
+                option.style.display = 'none';
+            }
+        });
     });
 </script>
 </body>
