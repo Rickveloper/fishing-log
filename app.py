@@ -534,21 +534,14 @@ def get_gps_for_location(location):
 @app.route("/get-events")
 def get_events():
     try:
-        with open(LOG_PATH, "r") as f:
+        with open("fishing-log-data/plans.json", "r") as f:
             data = json.load(f)
     except:
         data = []
     events = []
     for item in data:
-        gps = item.get("gps")
-        if not gps and item.get("location"):
-            gps = get_gps_for_location(item["location"])
-            if gps:
-                item["gps"] = gps
-                # Save GPS back to file for future use
-                with open(LOG_PATH, "w") as f:
-                    json.dump(data, f, indent=2)
         if item.get("type") == "plan":
+            gps = item.get("gps")
             events.append({
                 "title": f"Fishing at {item['location']}",
                 "start": item["date"],
@@ -556,18 +549,8 @@ def get_events():
                     "type": "plan",
                     "location": item["location"],
                     "notes": item.get("notes", ""),
-                    "gps": gps
-                }
-            })
-        elif "date" in item:  # Regular catch
-            events.append({
-                "title": f"Catch at {item['location']}",
-                "start": item["date"],
-                "backgroundColor": "#28a745",
-                "extendedProps": {
-                    "type": "catch",
-                    "location": item.get("location"),
-                    "gps": gps
+                    "gps": gps,
+                    "details": item.get("details", {})
                 }
             })
     return jsonify(events)

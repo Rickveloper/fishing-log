@@ -1,0 +1,44 @@
+{
+  "name": "fishing-log",
+  "version": "1.0.0",
+  "description": "Fishing Log Desktop Application",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --mac --x64 --config.mac.identity=null",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "electron": "^28.1.0",
+    "electron-builder": "^24.9.1"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "python-shell": "^5.0.0"
+  },
+  "build": {
+    "appId": "com.fishinglog.app",
+    "mac": {
+      "category": "public.app-category.lifestyle",
+      "icon": "static/fish-hook.png",
+      "identity": null,
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist"
+    },
+    "files": [
+      "**/*"
+    ],
+    "extraResources": [
+      { "from": "app.py", "to": "app.py" },
+      { "from": "weather_service.py", "to": "weather_service.py" },
+      { "from": "catches.json", "to": "catches.json" },
+      { "from": "static", "to": "static" },
+      { "from": "templates", "to": "templates" },
+      { "from": "venv", "to": "venv" }
+    ]
+  }
+} 

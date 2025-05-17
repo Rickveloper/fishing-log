@@ -1,4 +1,78 @@
-<nav style="background: #2d2d2d; color: #fff; padding: 12px 24px; display: flex; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-  <button onclick="window.history.back()" style="background: #444; color: #fff; border: none; border-radius: 4px; padding: 6px 16px; margin-right: 20px; cursor: pointer; font-size: 16px;">← Back</button>
-  <span style="font-size: 20px; font-weight: bold; letter-spacing: 1px;">Fishing Log</span>
-</nav> 
+<nav class="navbar">
+  <div class="navbar-left">
+    <img src="/static/fish-hook.png" alt="Logo" class="navbar-logo">
+    <span class="navbar-title">Fishing Log</span>
+  </div>
+  <div class="navbar-links">
+    <a href="/home" class="nav-link{% if request.path == '/home' %} active{% endif %}">Home</a>
+    <a href="/trips" class="nav-link{% if request.path == '/trips' %} active{% endif %}">Trips</a>
+    <a href="/statistics" class="nav-link{% if request.path == '/statistics' %} active{% endif %}">Stats</a>
+    <a href="/gallery" class="nav-link{% if request.path == '/gallery' %} active{% endif %}">Gallery</a>
+    <a href="/calendar" class="nav-link{% if request.path == '/calendar' %} active{% endif %}">Calendar</a>
+  </div>
+</nav>
+<style>
+.navbar {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 32px;
+  height: 64px;
+  background: linear-gradient(90deg, #1976d2 60%, #42a5f5 100%);
+  box-shadow: 0 2px 12px #1976d211;
+}
+.navbar-left {
+  display: flex;
+  align-items: center;
+}
+.navbar-logo {
+  height: 38px;
+  width: 38px;
+  margin-right: 16px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px #0002;
+  background: #fff;
+}
+.navbar-title {
+  font-size: 1.5em;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 1px;
+  font-family: 'Segoe UI', 'Roboto', Arial, sans-serif;
+}
+.navbar-links {
+  display: flex;
+  gap: 24px;
+}
+.nav-link {
+  color: #e3f2fd;
+  font-size: 1.08em;
+  font-weight: 500;
+  text-decoration: none;
+  padding: 8px 14px;
+  border-radius: 6px;
+  transition: background 0.18s, color 0.18s;
+}
+.nav-link:hover, .nav-link.active {
+  background: #fff;
+  color: #1976d2;
+}
+@media (max-width: 700px) {
+  .navbar {
+    flex-direction: column;
+    height: auto;
+    padding: 12px 8px;
+  }
+  .navbar-links {
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .navbar-title {
+    font-size: 1.1em;
+  }
+}
+</style> 

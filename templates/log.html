@@ -7,101 +7,145 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --primary: #1976d2;
+            --primary-light: #42a5f5;
+            --background: #f4f8fb;
+            --card-bg: #fff;
+            --card-shadow: 0 4px 24px #0002;
+            --input-bg: #fafdff;
+            --input-border: #b3c6e0;
+            --input-focus: #1976d2;
+            --accent: #e3f2fd;
+            --text: #222;
+            --text-light: #666;
+        }
         body {
-            font-family: 'Segoe UI', 'Roboto', Arial, sans-serif;
-            padding: 0;
-            background: #f4f8fb;
+            font-family: 'Inter', 'Segoe UI', 'Roboto', Arial, sans-serif;
+            background: var(--background);
             margin: 0;
+            color: var(--text);
+            transition: background 0.3s, color 0.3s;
+        }
+        .container {
+            max-width: 950px;
+            margin: 48px auto 0 auto;
+            padding: 36px 24px 48px 24px;
+            background: var(--card-bg);
+            border-radius: 20px;
+            box-shadow: var(--card-shadow);
         }
         .header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
-            margin-bottom: 24px;
+            margin-bottom: 28px;
         }
-        .container {
-            max-width: 900px;
-            margin: 40px auto 0 auto;
-            padding: 32px 24px 48px 24px;
-            background: #fff;
-            border-radius: 18px;
-            box-shadow: 0 4px 24px #0002;
+        .header h2 {
+            font-size: 2em;
+            font-weight: 700;
+            color: var(--primary);
+            margin: 0;
         }
-        .map {
-            height: 400px;
-            margin-top: 20px;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px #0001;
+        .header a {
+            color: var(--primary);
+            font-weight: 600;
+            text-decoration: none;
+            margin-left: 18px;
+            transition: color 0.18s;
+        }
+        .header a:hover {
+            color: var(--primary-light);
+        }
+        .dark-toggle {
+            position: absolute;
+            top: 18px;
+            right: 32px;
+            background: var(--primary);
+            color: #fff;
+            border: none;
+            border-radius: 50%;
+            width: 38px;
+            height: 38px;
+            font-size: 1.3em;
+            cursor: pointer;
+            box-shadow: 0 2px 8px #1976d211;
+            transition: background 0.18s;
+        }
+        .dark-toggle:hover {
+            background: var(--primary-light);
         }
         .catch-form {
-            background: #f7fbff;
-            padding: 28px 24px 24px 24px;
-            border-radius: 14px;
-            margin-top: 32px;
+            background: var(--accent);
+            padding: 32px 24px 24px 24px;
+            border-radius: 16px;
+            margin-top: 36px;
             box-shadow: 0 2px 8px #1976d211;
-            border: 1.5px solid #e3f2fd;
+            border: 1.5px solid var(--primary-light);
         }
         input, select, textarea {
-            padding: 12px;
+            padding: 14px;
             width: 100%;
-            margin-bottom: 14px;
+            margin-bottom: 16px;
             box-sizing: border-box;
-            border-radius: 7px;
-            border: 1.5px solid #b3c6e0;
-            font-size: 1.05em;
-            background: #fafdff;
-            transition: border 0.2s;
+            border-radius: 8px;
+            border: 1.5px solid var(--input-border);
+            font-size: 1.08em;
+            background: var(--input-bg);
+            transition: border 0.2s, background 0.2s;
         }
         input:focus, select:focus, textarea:focus {
-            border: 1.5px solid #1976d2;
+            border: 1.5px solid var(--input-focus);
             outline: none;
+            background: #e3f2fd;
         }
         button {
-            padding: 12px;
+            padding: 14px;
             width: 100%;
-            background: linear-gradient(90deg, #1976d2 60%, #42a5f5 100%);
+            background: linear-gradient(90deg, var(--primary) 60%, var(--primary-light) 100%);
             border: none;
             color: white;
             font-weight: bold;
-            font-size: 1.1em;
-            border-radius: 7px;
+            font-size: 1.15em;
+            border-radius: 8px;
             cursor: pointer;
             box-shadow: 0 2px 8px #1976d211;
             transition: background 0.18s, box-shadow 0.18s, transform 0.18s;
         }
         button:hover {
-            background: linear-gradient(90deg, #1256a3 60%, #1976d2 100%);
+            background: linear-gradient(90deg, var(--primary-light) 60%, var(--primary) 100%);
             box-shadow: 0 4px 16px #1976d244;
             transform: translateY(-2px) scale(1.03);
         }
         .catch-entry {
-            background: #fafdff;
-            padding: 22px 20px 18px 20px;
-            border-radius: 16px;
-            margin-top: 28px;
-            box-shadow: 0 2px 12px #1976d211;
-            border: 1.5px solid #e3f2fd;
+            background: var(--card-bg);
+            padding: 26px 22px 20px 22px;
+            border-radius: 18px;
+            margin-top: 32px;
+            box-shadow: var(--card-shadow);
+            border: 1.5px solid var(--primary-light);
             display: flex;
             flex-direction: column;
             align-items: flex-start;
-            max-width: 420px;
+            max-width: 440px;
         }
         .catch-entry img {
             max-width: 100%;
-            border-radius: 12px;
+            border-radius: 14px;
             box-shadow: 0 2px 8px #0002;
-            margin: 14px 0 10px 0;
+            margin: 16px 0 12px 0;
         }
         .catch-entry .catch-meta {
-            color: #1976d2;
-            font-size: 1.08em;
+            color: var(--primary);
+            font-size: 1.12em;
             margin-bottom: 2px;
-            font-weight: 500;
+            font-weight: 600;
         }
         .catch-entry .catch-angler {
-            color: #666;
+            color: var(--text-light);
             font-size: 1.05em;
             margin-bottom: 2px;
         }
@@ -116,6 +160,22 @@
             font-size: 0.98em;
             margin-bottom: 2px;
         }
+        .trip-summary {
+            background: linear-gradient(90deg, var(--primary-light) 0%, var(--primary) 100%);
+            color: #fff;
+            padding: 22px 28px;
+            border-radius: 14px;
+            box-shadow: 0 2px 8px #1976d211;
+            margin: 32px 0 12px 0;
+            display: flex;
+            gap: 36px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .trip-summary div {
+            font-size: 1.08em;
+            font-weight: 500;
+        }
         @media (max-width: 700px) {
             .container {
                 padding: 8px 2vw 24px 2vw;
@@ -123,10 +183,27 @@
             .catch-entry {
                 max-width: 100%;
             }
+            .trip-summary {
+                flex-direction: column;
+                gap: 12px;
+                padding: 16px 8px;
+            }
+        }
+        /* Dark mode styles */
+        body.dark {
+            --background: #181f2a;
+            --card-bg: #232c3a;
+            --input-bg: #232c3a;
+            --input-border: #3a4a6b;
+            --input-focus: #42a5f5;
+            --accent: #22304a;
+            --text: #e3f2fd;
+            --text-light: #b3c6e0;
         }
     </style>
 </head>
 <body>
+<button class="dark-toggle" onclick="toggleDarkMode()" title="Toggle dark mode">🌓</button>
 <div class="container">
     <div class="header">
         <h2>{{ location or 'None' }} — {{ date or 'None' }}</h2>
@@ -137,7 +214,7 @@
     </div>
 
     <!-- Trip Summary Card -->
-    <div style="background:#e3f2fd;padding:18px 24px;border-radius:12px;box-shadow:0 2px 8px #0001;margin:24px 0 8px 0;display:flex;gap:32px;flex-wrap:wrap;align-items:center;">
+    <div class="trip-summary">
         <div><strong>Total Catches:</strong> {{ trip_stats.total_catches }}</div>
         <div><strong>Most Common Species:</strong> {{ trip_stats.most_common_species or 'N/A' }}</div>
         <div><strong>Total Weight:</strong> {{ trip_stats.total_weight|round(2) }} lbs</div>
@@ -468,6 +545,14 @@
             }
         });
     });
+
+    function toggleDarkMode() {
+        document.body.classList.toggle('dark');
+        localStorage.setItem('darkMode', document.body.classList.contains('dark'));
+    }
+    if (localStorage.getItem('darkMode') === 'true') {
+        document.body.classList.add('dark');
+    }
 </script>
 </body>
 </html>

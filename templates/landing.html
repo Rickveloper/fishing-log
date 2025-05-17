@@ -1,122 +1,131 @@
+{% include 'navbar.html' %}
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Fishing Log - Start</title>
+    <title>Fishing Log - Welcome</title>
     <meta charset="utf-8">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         body {
-            font-family: sans-serif;
-            background: #f0f0f0;
+            font-family: 'Inter', 'Segoe UI', 'Roboto', Arial, sans-serif;
             margin: 0;
-            height: 100vh;
+            background: linear-gradient(135deg, #102542 0%, #1976d2 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+        .hero {
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
-        }
-        .container {
-            max-width: 420px;
-            width: 100%;
-            background: white;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            min-height: 80vh;
             text-align: center;
+            margin-top: 48px;
         }
-        input {
-            width: 100%;
-            padding: 12px;
-            margin-bottom: 16px;
-            font-size: 16px;
-            box-sizing: border-box;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-            outline: none;
+        .hero-logo {
+            width: 120px;
+            height: 120px;
+            border-radius: 24px;
+            box-shadow: 0 4px 24px #0003;
+            background: #fff;
+            margin-bottom: 32px;
         }
-        button {
-            width: 100%;
-            padding: 14px;
-            font-size: 18px;
-            background: #007bff;
-            border: none;
-            border-radius: 8px;
-            color: white;
-            font-weight: bold;
-            cursor: pointer;
-            transition: background 0.2s ease;
+        .hero-title {
+            font-size: 2.8em;
+            font-weight: 700;
+            margin-bottom: 12px;
+            letter-spacing: 1px;
         }
-        button:hover {
-            background: #0056b3;
+        .hero-tagline {
+            font-size: 1.35em;
+            font-weight: 400;
+            margin-bottom: 32px;
+            opacity: 0.95;
         }
-        .top-link {
-            text-align: center;
-            margin-bottom: 20px;
+        .cta-btn-group {
+            display: flex;
+            gap: 24px;
+            justify-content: center;
+            margin-bottom: 40px;
         }
-        .top-link a {
-            text-decoration: none;
-            font-weight: bold;
-            color: #007bff;
+        .cta-btn.slay {
+            background: linear-gradient(90deg, #42a5f5 0%, #1976d2 100%);
+            color: #fff;
         }
-        ul#autocomplete-results {
-            list-style-type: none;
-            padding: 0;
-            margin-top: -10px;
-            max-height: 150px;
-            overflow-y: auto;
-            background: white;
-            border: 1px solid #ccc;
-            border-radius: 6px;
+        .cta-btn.slay:hover {
+            background: #102542;
+            color: #fff;
         }
-        ul#autocomplete-results li {
-            padding: 10px;
-            cursor: pointer;
+        .cta-btn.log {
+            background: linear-gradient(90deg, #fff 0%, #e3f2fd 100%);
+            color: #1976d2;
         }
-        ul#autocomplete-results li:hover {
-            background: #eee;
+        .cta-btn.log:hover {
+            background: #1976d2;
+            color: #fff;
+        }
+        .features {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            margin-top: 24px;
+            flex-wrap: wrap;
+        }
+        .feature {
+            background: rgba(255,255,255,0.13);
+            border-radius: 14px;
+            padding: 24px 28px;
+            color: #fff;
+            font-size: 1.1em;
+            box-shadow: 0 2px 8px #1976d211;
+            min-width: 220px;
+            max-width: 320px;
+            margin-bottom: 18px;
+        }
+        .feature-icon {
+            font-size: 2.2em;
+            margin-bottom: 10px;
+            display: block;
+        }
+        @media (max-width: 700px) {
+            .hero-title {
+                font-size: 1.5em;
+            }
+            .features {
+                flex-direction: column;
+                gap: 18px;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="top-link">
-            <a href="/trips">View Past Trips</a> | <a href="/gallery">View Gallery</a> | <a href="/calendar">Fishing Calendar</a>
-        </div>
-        <h1>Where and when did you fish?</h1>
-        <form method="POST" id="trip-form">
-            <input type="text" name="location" id="location-input" placeholder="Enter Lake or Pond Name" autocomplete="off" required />
-            <ul id="autocomplete-results"></ul>
-            <input type="hidden" name="lat" id="lat" />
-            <input type="hidden" name="lon" id="lon" />
-            <input type="date" name="date" required />
-            <button type="submit">Start Log</button>
-        </form>
+<div class="hero">
+    <img src="/static/fish-hook.png" alt="Fishing Log Logo" class="hero-logo">
+    <div class="hero-title">Welcome to Fishing Log</div>
+    <div class="hero-tagline">Your personal fishing companion. Log every catch, track your stats, and relive your best days on the water.</div>
+    <div class="cta-btn-group">
+        <a href="/calendar"><button class="cta-btn slay">Slay Nation</button></a>
+        <a href="/log"><button class="cta-btn log">Log Fish</button></a>
     </div>
-
-    <script>
-        const input = document.getElementById("location-input");
-        const results = document.getElementById("autocomplete-results");
-
-        input.addEventListener("input", async () => {
-            const query = input.value;
-            if (query.length < 2) return results.innerHTML = "";
-            const res = await fetch(`https://photon.komoot.io/api/?q=${query}&limit=5&lang=en`);
-            const data = await res.json();
-            results.innerHTML = "";
-
-            data.features
-                .filter(f => f.properties.country === "United States")
-                .forEach(feature => {
-                    const li = document.createElement("li");
-                    li.textContent = feature.properties.name + ", " + (feature.properties.state || '');
-                    li.addEventListener("click", () => {
-                        input.value = feature.properties.name;
-                        document.getElementById("lat").value = feature.geometry.coordinates[1];
-                        document.getElementById("lon").value = feature.geometry.coordinates[0];
-                        results.innerHTML = "";
-                    });
-                    results.appendChild(li);
-                });
-        });
-    </script>
+    <div class="features">
+        <div class="feature">
+            <span class="feature-icon">🎣</span>
+            Log catches with photos, GPS, weather, and notes
+        </div>
+        <div class="feature">
+            <span class="feature-icon">📊</span>
+            View trip stats, biggest fish, and most effective baits
+        </div>
+        <div class="feature">
+            <span class="feature-icon">🗺️</span>
+            Interactive maps and trip history
+        </div>
+        <div class="feature">
+            <span class="feature-icon">🌙</span>
+            Beautiful dark mode for night anglers
+        </div>
+    </div>
+</div>
 </body>
 </html>
 
