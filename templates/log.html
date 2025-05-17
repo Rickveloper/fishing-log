@@ -329,29 +329,29 @@
         </div>
     {% else %}
         {% for c in valid_catches %}
-        <div class="catch-entry" id="catch-{{ c.id }}" style="background: #fff; box-shadow: 0 2px 8px #0001; border-radius: 14px; padding: 18px 20px 24px 20px; margin-top: 24px; display: flex; flex-direction: column; align-items: flex-start; max-width: 350px;">
-            <div style="font-size:1.25em; font-weight:700; margin-bottom: 4px; letter-spacing:0.01em;">{{ c.species }}</div>
-            <div style="color:#222; font-size:1.08em; margin-bottom: 2px;">{{ c.length }}" / {{ c.weight }} lbs <span style="color:#666;">on</span> <span style="font-weight:500;">{{ c.bait }}</span></div>
-            <div style="color:#666; font-size:1.05em; margin-bottom: 2px;">Caught by: <span style="font-weight:500;">{{ c.angler }}</span></div>
+        <div class="catch-entry" id="catch-{{ c.id }}" style="background: #fff; box-shadow: 0 2px 8px #1976d222; border-radius: 18px; padding: 22px 22px 18px 22px; margin: 32px 0 24px 0; display: flex; flex-direction: column; align-items: center; border: 1.5px solid #1976d2; max-width: 400px;">
+            <div style="font-size:1.35em; font-weight:800; color:#222; margin-bottom: 6px; text-align:center;">{{ c.species }}</div>
+            <div style="color:#333; font-size:1.08em; margin-bottom: 2px; text-align:center;">{{ c.length }}" / {{ c.weight }} lbs <span style="color:#666;">on</span> <span style="font-weight:500;">{{ c.bait }}</span></div>
+            <div style="color:#888; font-size:1.05em; margin-bottom: 8px; text-align:center;">Caught by: {{ c.angler or 'None' }}</div>
             {% if c.weather_data %}
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;">
-                <img src="https://openweathermap.org/img/wn/{{ c.weather_data.weather_icon }}@2x.png" alt="weather icon" style="width:38px;height:38px;vertical-align:middle;">
-                <span style="font-size:1.05em;">{{ c.weather_data.temperature|round(1) }}°F, {{ c.weather_data.weather_description|capitalize }}</span>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;justify-content:center;">
+                <img src="https://openweathermap.org/img/wn/{{ c.weather_data.weather_icon }}@2x.png" alt="weather icon" style="width:38px;height:38px;vertical-align:middle;background:#f4f4f4;border-radius:8px;">
+                <span style="font-size:1.08em;color:#222;">{{ c.weather_data.temperature|round(1) }}°F, {{ c.weather_data.weather_description|capitalize }}</span>
+            </div>
+            {% endif %}
+            {% if c.photo %}
+            <div style="width:100%;display:flex;justify-content:center;margin-bottom:14px;">
+                <img src="{{ url_for('static', filename='uploads/' ~ c.photo) }}" id="catch-photo-{{ c.id }}" style="display:block;margin:0 auto;width:auto;max-width:100%;max-height:220px;object-fit:contain;border-radius:14px;box-shadow:0 2px 8px #0002;cursor:pointer;transform: rotate({{ c.rotation|default(0) }}deg);background:none;" onclick="openModal(this.src)">
             </div>
             {% endif %}
             {% if c.weather %}<div style="color:#888; font-size:0.98em; margin-bottom:2px;">Weather (manual): {{ c.weather }}</div>{% endif %}
             {% if c.notes %}<div style="color:#888; font-size:0.98em; margin-bottom:2px;">Notes: {{ c.notes }}</div>{% endif %}
-            {% if c.photo %}
-            <img src="{{ url_for('static', filename='uploads/' ~ c.photo) }}" id="catch-photo-{{ c.id }}" style="max-width:100%;border-radius:12px;box-shadow:0 2px 8px #0002;margin:14px 0 10px 0;cursor:pointer;" onclick="openModal(this.src)">
-            {% endif %}
-            {% if c.id %}
-            <div style="display: flex; gap: 12px; margin-top: 8px; align-items: center; width:100%;">
-                <a href="/edit-catch/{{ c.id }}" style="background:#1976d2;color:white;padding:10px 0;border:none;border-radius:6px;text-decoration:none;font-weight:600;font-size:1em;transition:background 0.2s;display:inline-block;width:48%;text-align:center;box-shadow:0 1px 4px #0001;">Edit</a>
+            <div style="display: flex; gap: 14px; margin-top: 18px; align-items: center; width:100%; justify-content:center;">
+                <a href="/edit-catch/{{ c.id }}" style="background:#1976d2;color:white;padding:10px 0;border:none;border-radius:8px;text-decoration:none;font-weight:600;font-size:1em;transition:background 0.2s;display:inline-block;width:48%;text-align:center;box-shadow:0 1px 4px #0001;">Edit</a>
                 <form action="/delete-catch/{{ c.id }}" method="POST" style="display:inline; margin:0; width:48%;">
-                    <button type="submit" style="background:#dc3545;color:white;border:none;padding:10px 0;border-radius:6px;cursor:pointer;font-size:1em;display:inline-block;width:100%;font-weight:600;box-shadow:0 1px 4px #0001;">Delete</button>
+                    <button type="submit" style="background:#dc3545;color:white;border:none;padding:10px 0;border-radius:8px;cursor:pointer;font-size:1em;display:inline-block;width:100%;font-weight:600;box-shadow:0 1px 4px #0001;">Delete</button>
                 </form>
             </div>
-            {% endif %}
         </div>
         {% endfor %}
     {% endif %}
@@ -411,11 +411,17 @@
                             ${c.weather_data ? `<div style='display:flex;align-items:center;gap:8px;margin-bottom:2px;'><img src='https://openweathermap.org/img/wn/${c.weather_data.weather_icon}@2x.png' alt='weather icon' style='width:32px;height:32px;vertical-align:middle;'><span style='font-size:1em;'>${c.weather_data.temperature.toFixed(1)}°F, ${c.weather_data.weather_description.charAt(0).toUpperCase() + c.weather_data.weather_description.slice(1)}</span></div>` : ''}
                             ${c.weather ? `<div style='color:#888;font-size:0.95em;margin-bottom:2px;'>Weather (manual): ${c.weather}</div>` : ''}
                             ${c.notes ? `<div style='color:#888;font-size:0.95em;margin-bottom:2px;'>Notes: ${c.notes}</div>` : ''}
-                            <img src='/static/uploads/${c.photo}' style='max-width:100%;border-radius:10px;box-shadow:0 2px 8px #0002;margin-top:8px;display:block;cursor:pointer;' onclick='scrollToCatch("catch-${c.id}")'>
+                            <img src='/static/uploads/${c.photo}' style='max-width:100%;border-radius:10px;box-shadow:0 2px 8px #0002;margin-top:8px;display:block;cursor:pointer;' onclick='scrollToCatch("catch-${c.id}")' id='popup-img-${c.id}'>
                         </div>
                     `);
                 markerCluster.addLayer(m);
                 catchMarkers.push(m);
+                if (typeof c.rotation !== 'undefined') {
+                    setTimeout(function() {
+                        var img = document.getElementById('popup-img-' + c.id);
+                        if (img) img.style.transform = 'rotate(' + c.rotation + 'deg)';
+                    }, 100);
+                }
             }
         });
     }

@@ -269,6 +269,13 @@ def edit_catch(catch_id):
         catch["weather"] = request.form.get("weather")
         catch["notes"] = request.form.get("notes")
         catch["angler"] = request.form.get("angler")
+        # Save rotation value
+        rotation = request.form.get("rotation")
+        if rotation is not None:
+            try:
+                catch["rotation"] = int(rotation)
+            except Exception:
+                catch["rotation"] = 0
 
         with open(LOG_PATH, "w") as f:
             json.dump(data, f, indent=2)

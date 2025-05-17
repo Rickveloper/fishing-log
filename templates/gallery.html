@@ -26,9 +26,15 @@
             box-shadow: 0 4px 16px #0002;
         }
         .gallery-img {
-            width: 100%;
-            height: 180px;
-            object-fit: cover;
+            display: block;
+            margin: 0 auto;
+            max-width: 340px;
+            max-height: 240px;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            background: #222;
+            border-radius: 10px;
             border-bottom: 1px solid #eee;
         }
         .gallery-info {
@@ -40,46 +46,126 @@
         /* Modal */
         #galleryModal { display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); align-items:center; justify-content:center; z-index:9999; }
         #galleryModal .modal-content { background:#fff; border-radius:12px; max-width:90vw; max-height:90vh; padding:24px; box-shadow:0 2px 24px #0005; position:relative; display:flex; flex-direction:column; align-items:center; }
-        #galleryModal img { max-width:80vw; max-height:60vh; border-radius:10px; margin-bottom:18px; }
+        #galleryModal img {
+            max-width: 90vw;
+            max-height: 80vh;
+            object-fit: contain;
+            border-radius: 10px;
+            margin-bottom: 18px;
+            background: #222;
+            cursor: zoom-in;
+            transition: object-fit 0.2s, max-width 0.2s, max-height 0.2s, width 0.2s;
+        }
+        #galleryModal img.zoomed {
+            object-fit: unset;
+            width: 150vw;
+            height: auto;
+            max-width: none;
+            max-height: none;
+            cursor: zoom-out;
+        }
         #galleryModal .close-btn { position:absolute; top:18px; right:24px; font-size:2.2em; color:#333; cursor:pointer; }
         #galleryModal .modal-details { font-size:1.1em; text-align:center; }
+        #galleryModal .modal-content.zoomed {
+            overflow: auto;
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h2>Catch Gallery</h2>
-        {% set photos = catches | selectattr('photo') | list %}
-        {% if photos|length == 0 %}
-            <div style="background:#fff3cd;color:#856404;padding:18px 24px;border-radius:10px;margin-top:18px;font-size:1.15em;text-align:center;">
-                No photos uploaded yet! Go catch something awesome 🐟
-            </div>
-        {% else %}
-        <div class="gallery-grid">
-            {% for c in catches if c.photo %}
-            <div class="gallery-item" onclick="openGalleryModal({{ loop.index0 }})">
-                <img class="gallery-img" src="{{ url_for('static', filename='uploads/' ~ c.photo) }}" alt="Catch photo">
-                <div class="gallery-info">
-                    <strong>{{ c.species }}</strong><br>
-                    {{ c.length }}" / {{ c.weight or 'N/A' }} lbs<br>
-                    <span style="color:#666;">{{ c.bait }}</span>
-                </div>
-            </div>
-            {% endfor %}
+    <div class="container" style="display: flex; gap: 32px;">
+        <div id="locationSidebar" style="min-width: 200px; background: #f7faff; border-radius: 10px; box-shadow: 0 1px 6px #0001; padding: 18px 12px; height: fit-content;">
+            <h3 style="margin-top:0; font-size:1.15em; color:#1976d2;">Locations</h3>
+            <ul id="locationList" style="list-style:none; padding:0; margin:0;">
+                <!-- Locations will be populated by JS -->
+            </ul>
         </div>
-        {% endif %}
+        <div style="flex:1;">
+            <h2>Catch Gallery</h2>
+            {% set photos = catches | selectattr('photo') | list %}
+            {% if photos|length == 0 %}
+                <div style="background:#fff3cd;color:#856404;padding:18px 24px;border-radius:10px;margin-top:18px;font-size:1.15em;text-align:center;">
+                    No photos uploaded yet! Go catch something awesome 🐟
+                </div>
+            {% else %}
+            <div class="gallery-grid" id="galleryGrid">
+                {% for c in catches if c.photo %}
+                <div class="gallery-item" data-location="{{ c.location|e }}" onclick="openGalleryModal({{ loop.index0 }})">
+                    <div style="font-weight:600; color:#1976d2; font-size:1.08em; margin-bottom:4px; text-align:center;">{{ c.location }}</div>
+                    <img class="gallery-img" src="{{ url_for('static', filename='uploads/' ~ c.photo) }}" alt="Catch photo" style="transform: rotate({{ c.rotation|default(0) }}deg);">
+                    <div class="gallery-info">
+                        <strong>{{ c.species }}</strong><br>
+                        {{ c.length }}" / {{ c.weight or 'N/A' }} lbs<br>
+                        <span style="color:#666;">{{ c.bait }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
     </div>
     <div id="galleryModal" onclick="closeGalleryModal(event)">
         <div class="modal-content" onclick="event.stopPropagation()">
             <span class="close-btn" onclick="closeGalleryModal(event)">&times;</span>
-            <img id="modalImg" src="" alt="Catch photo">
+            <button id="rotateBtn" style="position:absolute;top:18px;left:24px;font-size:1.1em;padding:6px 14px;border-radius:6px;border:none;background:#1976d2;color:#fff;cursor:pointer;z-index:10001;">⟳ Rotate</button>
+            <img id="modalImg" src="" alt="Catch photo" style="transform: rotate(0deg);">
             <div class="modal-details" id="modalDetails"></div>
         </div>
     </div>
     <script>
         const catches = {{ catches|tojson }};
+        // Populate unique locations in sidebar
+        const locations = Array.from(new Set(catches.filter(c => c.photo).map(c => c.location))).sort();
+        const locationList = document.getElementById('locationList');
+        locations.forEach(loc => {
+            const li = document.createElement('li');
+            li.textContent = loc;
+            li.style.cursor = 'pointer';
+            li.style.padding = '6px 0';
+            li.onclick = () => filterByLocation(loc);
+            locationList.appendChild(li);
+        });
+        // Add 'All' option
+        const allLi = document.createElement('li');
+        allLi.textContent = 'All Locations';
+        allLi.style.cursor = 'pointer';
+        allLi.style.fontWeight = 'bold';
+        allLi.style.padding = '6px 0';
+        allLi.onclick = () => filterByLocation(null);
+        locationList.insertBefore(allLi, locationList.firstChild);
+        function filterByLocation(loc) {
+            document.querySelectorAll('.gallery-item').forEach(item => {
+                if (!loc || item.getAttribute('data-location') === loc) {
+                    item.style.display = '';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        }
+        // Rotate image logic
+        let currentRotation = 0;
+        const modalImg = document.getElementById('modalImg');
+        const rotateBtn = document.getElementById('rotateBtn');
+        rotateBtn.onclick = function(e) {
+            e.stopPropagation();
+            currentRotation = (currentRotation + 90) % 360;
+            modalImg.style.transform = `rotate(${currentRotation}deg)`;
+        };
+        let isZoomed = false;
+        const modalContent = document.querySelector('#galleryModal .modal-content');
+        modalImg.onclick = function(e) {
+            e.stopPropagation();
+            isZoomed = !isZoomed;
+            if (isZoomed) {
+                modalImg.classList.add('zoomed');
+                modalContent.classList.add('zoomed');
+            } else {
+                modalImg.classList.remove('zoomed');
+                modalContent.classList.remove('zoomed');
+            }
+        };
         function openGalleryModal(idx) {
             const c = catches.filter(c => c.photo)[idx];
-            document.getElementById('modalImg').src = '/static/uploads/' + c.photo;
+            modalImg.src = '/static/uploads/' + c.photo;
             document.getElementById('modalDetails').innerHTML = `
                 <strong>${c.species}</strong><br>
                 ${c.length}" / ${c.weight || 'N/A'} lbs<br>
@@ -88,9 +174,19 @@
                 ${c.notes ? `<div style='margin-top:8px;color:#888;'>Notes: ${c.notes}</div>` : ''}
             `;
             document.getElementById('galleryModal').style.display = 'flex';
+            currentRotation = 0;
+            modalImg.style.transform = 'rotate(0deg)';
+            isZoomed = false;
+            modalImg.classList.remove('zoomed');
+            modalContent.classList.remove('zoomed');
         }
         function closeGalleryModal(e) {
             document.getElementById('galleryModal').style.display = 'none';
+            currentRotation = 0;
+            modalImg.style.transform = 'rotate(0deg)';
+            isZoomed = false;
+            modalImg.classList.remove('zoomed');
+            modalContent.classList.remove('zoomed');
         }
     </script>
 </body>
